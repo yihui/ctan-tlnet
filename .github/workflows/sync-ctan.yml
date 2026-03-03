@@ -72,8 +72,7 @@ jobs:
             rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
             "$STAGING_DIR/" \
             2>&1 \
-            | grep -v "skipping non-regular file" \
-            | tee /tmp/rsync-changes.txt
+            > /tmp/rsync-changes.txt
           exit ${PIPESTATUS[0]}
 
       - name: Parse rsync changes
@@ -121,6 +120,8 @@ jobs:
             echo "Nothing to upload."
             exit 0
           fi
+          echo "Files to upload:"
+          cat /tmp/to-upload.txt
           rclone copy \
             "$STAGING_DIR/" \
             r2:${{ secrets.R2_BUCKET_NAME }} \
@@ -142,6 +143,8 @@ jobs:
             echo "Nothing to delete."
             exit 0
           fi
+          echo "Files to delete:"
+          cat /tmp/to-delete.txt
           while IFS= read -r f; do
             rclone delete "r2:${{ secrets.R2_BUCKET_NAME }}/$f" --log-level INFO
           done < /tmp/to-delete.txt
