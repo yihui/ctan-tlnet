@@ -56,8 +56,8 @@ jobs:
             --hard-links \
             --partial \
             --stats \
-            --exclude='/archive/*.doc.tar.xz' \
-            --exclude='/archive/*.source.tar.xz' \
+            --exclude='/archive/*.doc.*.tar.xz' \
+            --exclude='/archive/*.source.*.tar.xz' \
             rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
             "$STAGING_DIR/"
 
