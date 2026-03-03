@@ -25,6 +25,8 @@ jobs:
       - name: Install rclone
         run: |
           curl -fsSL https://rclone.org/install.sh | sudo bash
+          mkdir -p ~/.config/rclone
+          touch ~/.config/rclone/rclone.conf
           rclone version
           rsync --version
 
