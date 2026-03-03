@@ -2,13 +2,13 @@ name: Sync CTAN tlnet
 
 on:
   schedule:
-    - cron: '0 */6 * * *'   # every 6 hours, per CTAN mirroring policy
-  workflow_dispatch:         # allow manual trigger (useful for the initial sync)
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 360     # initial sync can take several hours
+    timeout-minutes: 360
 
     env:
       RCLONE_CONFIG_R2_TYPE: s3
@@ -17,72 +17,81 @@ jobs:
       RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true"
-      RCLONE_TRANSFERS: "8"
-      RCLONE_CHECKERS: "16"
+      STAGING_DIR: /mnt/tlnet
 
     steps:
       - name: Install rclone
         run: |
           curl -fsSL https://rclone.org/install.sh | sudo bash
           rclone version
+          rsync --version
 
-      - name: Write rclone filter file
+      # Restore the staging dir from the previous run's cache.
+      # Key is intentionally static: we always want to restore+overwrite
+      # the same entry rather than accumulate a new cache per run.
+      - name: Restore tlnet cache
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.STAGING_DIR }}
+          key: tlnet-${{ runner.os }}
+
+      - name: Report cache status
         run: |
-          cat > /tmp/tlnet-filter.txt << 'EOF'
-          # ============================================================
-          # CTAN tlnet rclone filter
-          # Paths are relative to the tlnet/ root being synced.
-          # Rules evaluated top-to-bottom; first match wins.
-          # ============================================================
+          if [ "${{ steps.cache-restore.outputs.cache-hit }}" = "true" ]; then
+            echo "Cache hit — rsync will only transfer the delta."
+            du -sh "$STAGING_DIR" || true
+          else
+            echo "Cache miss — rsync will do a full download."
+          fi
+          mkdir -p "$STAGING_DIR"
 
-          # KEEP: package database and metadata (tiny, essential for tlmgr)
-          + /tlpkg/**
+      - name: Rsync CTAN tlnet to local staging
+        run: |
+          rsync \
+            --archive \
+            --delete \
+            --delete-excluded \
+            --hard-links \
+            --partial \
+            --stats \
+            --exclude='/archive/*.doc.tar.xz' \
+            --exclude='/archive/*.source.tar.xz' \
+            rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
+            "$STAGING_DIR/"
 
-          # KEEP: installer scripts
-          + /install-tl
-          + /install-tl.zip
-          + /install-tl-unx.tar.gz
-          + /install-tl-windows.exe
+      - name: Report staging size
+        run: |
+          du -sh "$STAGING_DIR"
+          echo ""
+          echo "NOTE: if the size above is close to or over 10 GB, the cache"
+          echo "save step below will be skipped by GitHub and every run will"
+          echo "do a full rsync download. Consider switching to a persistent VM."
 
-          # DROP: documentation tarballs (~8 GB saved)
-          - /archive/*.doc.tar.xz
+      # Delete the old cache entry before saving the new one.
+      # actions/cache has no built-in overwrite; without this step the save
+      # is silently skipped when the key already exists.
+      - name: Delete old cache entry
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh cache delete tlnet-${{ runner.os }} \
+            --repo ${{ github.repository }} || true
+          # '|| true' so the step doesn't fail if the cache didn't exist yet
 
-          # DROP: source tarballs (~3 GB saved)
-          - /archive/*.source.tar.xz
+      - name: Save tlnet cache
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.STAGING_DIR }}
+          key: tlnet-${{ runner.os }}
 
-          # KEEP: everything else in archive/
-          # Includes runtime tarballs (foo.tar.xz) and all platform
-          # binaries (foo.x86_64-linux.tar.xz, foo.aarch64-linux.tar.xz, etc.)
-          + /archive/*.tar.xz
-
-          # DROP everything not matched above
-          - **
-          EOF
-          sed -i 's/^[[:space:]]*//' /tmp/tlnet-filter.txt
-          echo "--- filter file ---"
-          cat /tmp/tlnet-filter.txt
-
-      - name: Dry-run (logs what would change, does not upload)
+      - name: Sync staging dir to R2
         run: |
           rclone sync \
-            rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
+            "$STAGING_DIR/" \
             r2:${{ secrets.R2_BUCKET_NAME }} \
-            --filter-from /tmp/tlnet-filter.txt \
-            --transfers "$RCLONE_TRANSFERS" \
-            --checkers "$RCLONE_CHECKERS" \
-            --dry-run \
-            --stats 30s \
-            2>&1 | tail -50
-        continue-on-error: true
-
-      - name: Sync CTAN tlnet to R2
-        run: |
-          rclone sync \
-            rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
-            r2:${{ secrets.R2_BUCKET_NAME }} \
-            --filter-from /tmp/tlnet-filter.txt \
-            --transfers "$RCLONE_TRANSFERS" \
-            --checkers "$RCLONE_CHECKERS" \
+            --transfers 8 \
+            --checkers 16 \
             --stats 60s \
             --stats-one-line \
             --use-mmap \
