@@ -67,7 +67,9 @@ jobs:
             --exclude='/archive/*.source.tar.xz' \
             --exclude='/archive/*.source.*.tar.xz' \
             rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
-            "$STAGING_DIR/"
+            "$STAGING_DIR/" \
+            2>&1 | grep -v "skipping non-regular file"
+          exit ${PIPESTATUS[0]}
 
       - name: Report staging size
         run: |
