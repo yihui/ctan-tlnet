@@ -69,6 +69,7 @@ jobs:
             --exclude='/archive/*.doc.*.tar.xz' \
             --exclude='/archive/*.source.tar.xz' \
             --exclude='/archive/*.source.*.tar.xz' \
+            --exclude='/update-tlmgr-*' \
             rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
             "$STAGING_DIR/" \
             2>&1 \
