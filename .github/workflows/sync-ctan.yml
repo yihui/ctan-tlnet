@@ -44,7 +44,8 @@ jobs:
           else
             echo "Cache miss — rsync will do a full download."
           fi
-          mkdir -p "$STAGING_DIR"
+          sudo mkdir -p "$STAGING_DIR"
+          sudo chown "$USER" "$STAGING_DIR"
 
       - name: Rsync CTAN tlnet to local staging
         run: |
