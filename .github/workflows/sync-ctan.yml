@@ -26,6 +26,11 @@ jobs:
           rclone version
           rsync --version
 
+      - name: Create staging directory
+        run: |
+          sudo mkdir -p "$STAGING_DIR"
+          sudo chown "$USER" "$STAGING_DIR"
+
       # Restore the staging dir from the previous run's cache.
       # Key is intentionally static: we always want to restore+overwrite
       # the same entry rather than accumulate a new cache per run.
@@ -44,8 +49,6 @@ jobs:
           else
             echo "Cache miss — rsync will do a full download."
           fi
-          sudo mkdir -p "$STAGING_DIR"
-          sudo chown "$USER" "$STAGING_DIR"
 
       - name: Rsync CTAN tlnet to local staging
         run: |
@@ -54,9 +57,12 @@ jobs:
             --delete \
             --delete-excluded \
             --hard-links \
+            --no-links \
             --partial \
             --stats \
+            --exclude='/archive/*.doc.tar.xz' \
             --exclude='/archive/*.doc.*.tar.xz' \
+            --exclude='/archive/*.source.tar.xz' \
             --exclude='/archive/*.source.*.tar.xz' \
             rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
             "$STAGING_DIR/"
