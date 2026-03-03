@@ -54,22 +54,40 @@ jobs:
 
       - name: Rsync CTAN tlnet to local staging
         run: |
+          # --itemize-changes prints one line per changed file:
+          #   >f+++++++++ path/to/new-or-changed-file
+          #   *deleting   path/to/removed-file
           rsync \
             --archive \
             --delete \
             --delete-excluded \
-            --hard-links \
             --no-links \
+            --hard-links \
             --partial \
-            --stats \
+            --itemize-changes \
             --exclude='/archive/*.doc.tar.xz' \
             --exclude='/archive/*.doc.*.tar.xz' \
             --exclude='/archive/*.source.tar.xz' \
             --exclude='/archive/*.source.*.tar.xz' \
             rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
             "$STAGING_DIR/" \
-            2>&1 | grep -v "skipping non-regular file"
+            2>&1 \
+            | grep -v "skipping non-regular file" \
+            | tee /tmp/rsync-changes.txt
           exit ${PIPESTATUS[0]}
+
+      - name: Parse rsync changes
+        run: |
+          # Lines starting with >f = new or updated file
+          grep '^>f' /tmp/rsync-changes.txt \
+            | awk '{print $2}' > /tmp/to-upload.txt || true
+
+          # Lines starting with *deleting = file removed from source
+          grep '^\*deleting' /tmp/rsync-changes.txt \
+            | awk '{print $2}' > /tmp/to-delete.txt || true
+
+          echo "Files to upload: $(wc -l < /tmp/to-upload.txt)"
+          echo "Files to delete: $(wc -l < /tmp/to-delete.txt)"
 
       - name: Report staging size
         run: |
@@ -88,7 +106,6 @@ jobs:
         run: |
           gh cache delete tlnet-${{ runner.os }} \
             --repo ${{ github.repository }} || true
-          # '|| true' so the step doesn't fail if the cache didn't exist yet
 
       - name: Save tlnet cache
         uses: actions/cache/save@v4
@@ -96,13 +113,20 @@ jobs:
           path: ${{ env.STAGING_DIR }}
           key: tlnet-${{ runner.os }}
 
-      - name: Sync staging dir to R2
+      # rclone copy only uploads files rsync flagged as new/changed.
+      # No listing or checking — rclone blindly pushes exactly these files.
+      - name: Upload changed files to R2
         run: |
-          rclone sync \
+          if [ ! -s /tmp/to-upload.txt ]; then
+            echo "Nothing to upload."
+            exit 0
+          fi
+          rclone copy \
             "$STAGING_DIR/" \
             r2:${{ secrets.R2_BUCKET_NAME }} \
+            --files-from /tmp/to-upload.txt \
+            --no-traverse \
             --transfers 8 \
-            --checkers 16 \
             --stats 60s \
             --stats-one-line \
             --use-mmap \
@@ -110,6 +134,17 @@ jobs:
             --low-level-retries 10 \
             --retries-sleep 30s \
             --log-level INFO
+
+      # rclone delete for each removed file.
+      - name: Delete removed files from R2
+        run: |
+          if [ ! -s /tmp/to-delete.txt ]; then
+            echo "Nothing to delete."
+            exit 0
+          fi
+          while IFS= read -r f; do
+            rclone delete "r2:${{ secrets.R2_BUCKET_NAME }}/$f" --log-level INFO
+          done < /tmp/to-delete.txt
 
       - name: Print bucket summary
         if: always()
