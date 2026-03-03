@@ -9,6 +9,8 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    permissions:
+      actions: write   # needed for gh cache delete
 
     env:
       RCLONE_CONFIG_R2_TYPE: s3
