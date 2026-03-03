@@ -1,0 +1,104 @@
+name: Sync CTAN tlnet
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # every 6 hours, per CTAN mirroring policy
+  workflow_dispatch:         # allow manual trigger (useful for the initial sync)
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360     # initial sync can take several hours
+
+    env:
+      RCLONE_CONFIG_R2_TYPE: s3
+      RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+      RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true"
+      RCLONE_TRANSFERS: "8"
+      RCLONE_CHECKERS: "16"
+
+    steps:
+      - name: Install rclone
+        run: |
+          curl -fsSL https://rclone.org/install.sh | sudo bash
+          rclone version
+
+      - name: Write rclone filter file
+        run: |
+          cat > /tmp/tlnet-filter.txt << 'EOF'
+          # ============================================================
+          # CTAN tlnet rclone filter
+          # Paths are relative to the tlnet/ root being synced.
+          # Rules evaluated top-to-bottom; first match wins.
+          # ============================================================
+
+          # KEEP: package database and metadata (tiny, essential for tlmgr)
+          + /tlpkg/**
+
+          # KEEP: installer scripts
+          + /install-tl
+          + /install-tl.zip
+          + /install-tl-unx.tar.gz
+          + /install-tl-windows.exe
+
+          # DROP: documentation tarballs (~8 GB saved)
+          - /archive/*.doc.tar.xz
+
+          # DROP: source tarballs (~3 GB saved)
+          - /archive/*.source.tar.xz
+
+          # KEEP: everything else in archive/
+          # Includes runtime tarballs (foo.tar.xz) and all platform
+          # binaries (foo.x86_64-linux.tar.xz, foo.aarch64-linux.tar.xz, etc.)
+          + /archive/*.tar.xz
+
+          # DROP everything not matched above
+          - **
+          EOF
+          sed -i 's/^[[:space:]]*//' /tmp/tlnet-filter.txt
+          echo "--- filter file ---"
+          cat /tmp/tlnet-filter.txt
+
+      - name: Dry-run (logs what would change, does not upload)
+        run: |
+          rclone sync \
+            rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
+            r2:${{ secrets.R2_BUCKET_NAME }} \
+            --filter-from /tmp/tlnet-filter.txt \
+            --transfers "$RCLONE_TRANSFERS" \
+            --checkers "$RCLONE_CHECKERS" \
+            --dry-run \
+            --stats 30s \
+            2>&1 | tail -50
+        continue-on-error: true
+
+      - name: Sync CTAN tlnet to R2
+        run: |
+          rclone sync \
+            rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
+            r2:${{ secrets.R2_BUCKET_NAME }} \
+            --filter-from /tmp/tlnet-filter.txt \
+            --transfers "$RCLONE_TRANSFERS" \
+            --checkers "$RCLONE_CHECKERS" \
+            --stats 60s \
+            --stats-one-line \
+            --use-mmap \
+            --retries 5 \
+            --low-level-retries 10 \
+            --retries-sleep 30s \
+            --log-level INFO
+
+      - name: Print bucket summary
+        if: always()
+        run: |
+          echo "Sync completed at $(date -u)"
+          rclone size r2:${{ secrets.R2_BUCKET_NAME }} --json 2>/dev/null \
+            | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          gb = d['bytes'] / 1024**3
+          print(f'Bucket: {gb:.2f} GB, {d[\"count\"]} files')
+          " || true
