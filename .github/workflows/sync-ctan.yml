@@ -19,7 +19,7 @@ jobs:
       RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true"
-      STAGING_DIR: /mnt/tlnet
+      STAGING_DIR: $HOME/tlnet
 
     steps:
       - name: Install rclone
@@ -29,11 +29,8 @@ jobs:
           rsync --version
 
       - name: Create staging directory
-        run: |
-          sudo mkdir -p "$STAGING_DIR"
-          sudo chown "$USER" "$STAGING_DIR"
+        run: mkdir -p "$STAGING_DIR"
 
-      # Restore the staging dir from the previous run's cache.
       # Key is intentionally static: we always want to restore+overwrite
       # the same entry rather than accumulate a new cache per run.
       - name: Restore tlnet cache
@@ -42,6 +39,9 @@ jobs:
         with:
           path: ${{ env.STAGING_DIR }}
           key: tlnet-${{ runner.os }}
+
+      - name: Remove symlinks left over from cache
+        run: find "$STAGING_DIR" -type l -delete
 
       - name: Report cache status
         run: |
