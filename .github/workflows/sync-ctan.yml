@@ -57,8 +57,7 @@ jobs:
           # --itemize-changes prints one line per changed file:
           #   >f+++++++++ path/to/new-or-changed-file
           #   *deleting   path/to/removed-file
-          # Output is written directly to the changes file; rsync's own
-          # progress/stats still go to stdout for the GHA log.
+          # Redirect all output to the changes file; no progress or stats.
           rsync \
             --archive \
             --delete \
@@ -66,16 +65,15 @@ jobs:
             --no-links \
             --hard-links \
             --partial \
-            --stats \
             --itemize-changes \
             --exclude='/archive/*.doc.tar.xz' \
             --exclude='/archive/*.doc.*.tar.xz' \
             --exclude='/archive/*.source.tar.xz' \
             --exclude='/archive/*.source.*.tar.xz' \
             --exclude='/update-tlmgr-*' \
-            --log-file=/tmp/rsync-changes.txt \
             rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
-            "$STAGING_DIR/"
+            "$STAGING_DIR/" \
+            > /tmp/rsync-changes.txt
 
       - name: Parse rsync changes
         run: |
@@ -112,8 +110,9 @@ jobs:
           path: ${{ env.STAGING_DIR }}
           key: tlnet-${{ runner.os }}
 
+      # cache-key is empty when the save was skipped or failed
       - name: Halt if cache save failed
-        if: steps.cache-save.outputs.cache-id == ''
+        if: steps.cache-save.outputs.cache-key == ''
         run: |
           echo "Cache save failed — staging dir was not persisted."
           echo "Next run will do a full rsync download."
