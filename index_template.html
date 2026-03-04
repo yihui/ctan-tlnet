@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>$title</title>
+<style>
+  body  { font-family: system-ui, sans-serif; font-size: 0.9rem;
+          margin: 2rem; color: #222; background: #fff; }
+  h1    { font-size: 1.1rem; margin-bottom: 0.25rem; word-break: break-all; }
+  .meta { color: #666; font-size: 0.8rem; margin-bottom: 1rem; }
+  nav   { font-size: 0.85rem; margin-bottom: 1.5rem; color: #555; }
+  nav a, nav span { text-decoration: none; }
+  nav a { color: #0057b8; }
+  nav a:hover { text-decoration: underline; }
+  .readme { background: #f8f8f8; border-left: 3px solid #ccc;
+            padding: 0.75rem 1rem; margin-bottom: 1.5rem;
+            font-size: 0.85rem; overflow-x: auto; }
+  .readme h1, .readme h2, .readme h3 { font-size: 1rem; margin: 0.5rem 0 0.25rem; }
+  .readme pre  { background: #eee; padding: 0.5rem; overflow-x: auto; }
+  .readme code { font-size: 0.82rem; }
+  ul.listing { list-style: none; padding: 0; margin: 0;
+               columns: 25em; column-gap: 2rem; }
+  li.entry { display: flex; justify-content: space-between; gap: 1rem;
+             padding: 0.1rem 0; break-inside: avoid; }
+  li.entry a { color: #0057b8; text-decoration: none;
+               overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  li.entry a:hover { text-decoration: underline; }
+  li.entry span { color: #888; font-size: 0.8rem; white-space: nowrap; flex-shrink: 0; }
+  li.dir a { color: #555; font-weight: 500; }
+  .footer { margin-top: 1.5rem; color: #888; font-size: 0.75rem; border-top: 1px solid #eee; padding-top: 0.75rem; }
+  .footer a { color: #0057b8; text-decoration: none; }
+  .footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<nav>$breadcrumb</nav>
+<h1>$title</h1>
+<div class="meta">Generated $meta</div>
+$readme_section
+<ul class="listing">
+    $listing
+</ul>
+<div class="footer">
+  CTAN tlnet mirror maintained by <a href="https://yihui.org">Yihui Xie</a>
+</div>
+</body>
+</html>
