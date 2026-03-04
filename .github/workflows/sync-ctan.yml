@@ -2,7 +2,7 @@ name: Sync CTAN tlnet
 
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 0 * * *'   # daily at 00:00 UTC
   workflow_dispatch:
 
 jobs:
@@ -33,8 +33,6 @@ jobs:
       - name: Create staging directory
         run: mkdir -p "$STAGING_DIR"
 
-      # Key is intentionally static: we always want to restore+overwrite
-      # the same entry rather than accumulate a new cache per run.
       - name: Restore tlnet cache
         id: cache-restore
         uses: actions/cache/restore@v4
@@ -59,6 +57,8 @@ jobs:
           # --itemize-changes prints one line per changed file:
           #   >f+++++++++ path/to/new-or-changed-file
           #   *deleting   path/to/removed-file
+          # Output is written directly to the changes file; rsync's own
+          # progress/stats still go to stdout for the GHA log.
           rsync \
             --archive \
             --delete \
@@ -66,17 +66,16 @@ jobs:
             --no-links \
             --hard-links \
             --partial \
+            --stats \
             --itemize-changes \
             --exclude='/archive/*.doc.tar.xz' \
             --exclude='/archive/*.doc.*.tar.xz' \
             --exclude='/archive/*.source.tar.xz' \
             --exclude='/archive/*.source.*.tar.xz' \
             --exclude='/update-tlmgr-*' \
+            --log-file=/tmp/rsync-changes.txt \
             rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
-            "$STAGING_DIR/" \
-            2>&1 \
-            > /tmp/rsync-changes.txt
-          exit ${PIPESTATUS[0]}
+            "$STAGING_DIR/"
 
       - name: Parse rsync changes
         run: |
@@ -92,16 +91,13 @@ jobs:
           echo "Files to delete: $(wc -l < /tmp/to-delete.txt)"
 
       - name: Report staging size
-        run: |
-          du -sh "$STAGING_DIR"
-          echo ""
-          echo "NOTE: if the size above is close to or over 10 GB, the cache"
-          echo "save step below will be skipped by GitHub and every run will"
-          echo "do a full rsync download. Consider switching to a persistent VM."
+        run: du -sh "$STAGING_DIR"
 
-      # Delete the old cache entry before saving the new one.
-      # actions/cache has no built-in overwrite; without this step the save
-      # is silently skipped when the key already exists.
+      # actions/cache has no built-in overwrite support — if the key already
+      # exists, cache/save silently skips saving. To force an update we must
+      # first delete the existing entry, then save under the same key.
+      # The '|| true' on delete is intentional: the first-ever run has no
+      # cache entry to delete, and we don't want that to fail the workflow.
       - name: Delete old cache entry
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -110,21 +106,25 @@ jobs:
             --repo ${{ github.repository }} || true
 
       - name: Save tlnet cache
+        id: cache-save
         uses: actions/cache/save@v4
         with:
           path: ${{ env.STAGING_DIR }}
           key: tlnet-${{ runner.os }}
 
-      # rclone copy only uploads files rsync flagged as new/changed.
-      # No listing or checking — rclone blindly pushes exactly these files.
+      - name: Halt if cache save failed
+        if: steps.cache-save.outputs.cache-id == ''
+        run: |
+          echo "Cache save failed — staging dir was not persisted."
+          echo "Next run will do a full rsync download."
+          exit 1
+
       - name: Upload changed files to R2
         run: |
           if [ ! -s /tmp/to-upload.txt ]; then
             echo "Nothing to upload."
             exit 0
           fi
-          echo "Files to upload:"
-          cat /tmp/to-upload.txt
           rclone copy \
             "$STAGING_DIR/" \
             r2:${{ secrets.R2_BUCKET_NAME }} \
@@ -139,18 +139,31 @@ jobs:
             --retries-sleep 30s \
             --log-level INFO
 
-      # rclone delete for each removed file.
       - name: Delete removed files from R2
         run: |
           if [ ! -s /tmp/to-delete.txt ]; then
             echo "Nothing to delete."
             exit 0
           fi
-          echo "Files to delete:"
-          cat /tmp/to-delete.txt
           while IFS= read -r f; do
             rclone delete "r2:${{ secrets.R2_BUCKET_NAME }}/$f" --log-level INFO
           done < /tmp/to-delete.txt
+
+      - name: Final sync to R2 (size-only, safety net)
+        run: |
+          rclone sync \
+            "$STAGING_DIR/" \
+            r2:${{ secrets.R2_BUCKET_NAME }} \
+            --size-only \
+            --transfers 8 \
+            --checkers 16 \
+            --stats 60s \
+            --stats-one-line \
+            --use-mmap \
+            --retries 5 \
+            --low-level-retries 10 \
+            --retries-sleep 30s \
+            --log-level INFO
 
       - name: Print bucket summary
         if: always()
