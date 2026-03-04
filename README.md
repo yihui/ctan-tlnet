@@ -1,2 +1,1 @@
-# ctan-tlnet
-Sync the tlnet directory from CTAN to CDN (Cloudflare R2)
+This site mirrors [the tlnet directory](https://www.ctan.org/tex-archive/systems/texlive/tlnet) from CTAN to Cloudflare R2 to serve TeX Live and [TinyTeX](https://yihui.org/tinytex/) users. Note that the `update-tlmgr-*` scripts are not included. This is _not_ a full CTAN mirror. The site is maintainer by [Yihui Xie](https://yihui.org), and automatically generated from the GitHub repo [yihui/ctan-tlnet](https://github.com/yihui/ctan-tlnet) on a daily basis.
