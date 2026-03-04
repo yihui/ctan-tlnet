@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 0 * * *'   # daily at 00:00 UTC
   workflow_dispatch:
+    inputs:
+      force_index:
+        description: 'Force rebuild of all index pages'
+        type: boolean
+        default: false
 
 jobs:
   sync:
@@ -22,9 +27,13 @@ jobs:
       STAGING_DIR: $HOME/tlnet
 
     steps:
-      - name: Install rclone
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install rclone and cmark
         run: |
           curl -fsSL https://rclone.org/install.sh | sudo bash
+          sudo apt-get install -y cmark
           mkdir -p ~/.config/rclone
           touch ~/.config/rclone/rclone.conf
           rclone version
@@ -104,12 +113,24 @@ jobs:
             --repo ${{ github.repository }} || true
 
       - name: Save tlnet cache
-        id: cache-save
         uses: actions/cache/save@v4
         with:
           path: ${{ env.STAGING_DIR }}
           key: tlnet-${{ runner.os }}
 
+      # build_indexes.py reads index_template.html from the repo root.
+      # It exits early (no-op) if both to-upload and to-delete are empty.
+      # On rebuild it walks every directory, writes index.html into each,
+      # and appends their relative paths to to-upload.txt so rclone picks
+      # them up in the next step.
+      - name: Build directory index pages
+        run: |
+          python3 build_indexes.py \
+            "$STAGING_DIR" \
+            /tmp/to-upload.txt \
+            /tmp/to-delete.txt \
+            index_template.html \
+            ${{ inputs.force_index || 'false' }}
 
       - name: Upload changed files to R2
         run: |
