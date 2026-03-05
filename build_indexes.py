@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Build index.html for every directory in the tlnet staging tree.
+"""Build index.html for root dir and one level down in the tlnet staging tree.
 
 Usage:
-    build_indexes.py <staging_dir> <to_upload_file> <to_delete_file> <template> [force]
+    build_indexes.py <staging_dir> <to_upload_file> <to_delete_file> <template> <readme> [force]
 
 Exits early (no-op) if both to_upload_file and to_delete_file are empty,
 i.e. rsync found no changes since the last sync, unless force=true.
@@ -36,7 +36,8 @@ def md_to_html(md_path: Path) -> str:
         print(f"Warning: cmark failed for {md_path}: {e}", file=sys.stderr)
         return ''
 
-def build_index(dirpath: Path, staging_dir: Path, template: Template) -> str:
+def build_index(dirpath: Path, staging_dir: Path, template: Template,
+                footer_html: str) -> str:
     rel = dirpath.relative_to(staging_dir)
 
     # Breadcrumb
@@ -58,21 +59,30 @@ def build_index(dirpath: Path, staging_dir: Path, template: Template) -> str:
     subdirs = [e for e in entries if e.is_dir()  and e.name not in SKIP_DIRS]
     files   = [e for e in entries if e.is_file() and e.name != 'index.html']
 
-    # README
+    # README above listing
     readme_html = ''
     readme_path = dirpath / 'README.md'
     if readme_path.exists():
         readme_html = md_to_html(readme_path)
+    readme_section = f'<div class="readme">{readme_html}</div>' if readme_html else ''
 
     # File listing rows
     rows = []
     if dirpath != staging_dir:
         rows.append('<li class="entry dir"><a href="../">../</a><span></span></li>')
+    # Only link subdirs if they have an index.html (root and 1-level-down only)
+    depth = len(rel.parts)
     for d in subdirs:
-        rows.append(
-            f'<li class="entry dir">'
-            f'<a href="{d.name}/">{d.name}/</a><span></span></li>'
-        )
+        if depth == 0:  # root: subdirs are 1 level down, they have index.html
+            rows.append(
+                f'<li class="entry dir">'
+                f'<a href="{d.name}/">{d.name}/</a><span></span></li>'
+            )
+        else:           # 1-level-down: subdirs are 2 levels down, no index.html
+            rows.append(
+                f'<li class="entry dir">'
+                f'<span class="dirname">{d.name}/</span><span></span></li>'
+            )
     for f in files:
         try:
             sz = human_size(f.stat().st_size)
@@ -85,13 +95,13 @@ def build_index(dirpath: Path, staging_dir: Path, template: Template) -> str:
 
     title  = f'tlnet/{rel}' if str(rel) != '.' else 'tlnet'
     now    = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
-    readme_section = f'<div class="readme">{readme_html}</div>' if readme_html else ''
 
     return template.substitute(
         title=title,
         breadcrumb=breadcrumb,
         meta=now,
         readme_section=readme_section,
+        footer_content=footer_html,
         listing='\n    '.join(rows),
     )
 
@@ -101,7 +111,9 @@ def main():
     delete_file   = sys.argv[3]
     template_file = Path(sys.argv[4]) if len(sys.argv) > 4 \
                     else Path(__file__).with_name('index_template.html')
-    force         = len(sys.argv) > 5 and sys.argv[5].lower() == 'true'
+    readme_file   = Path(sys.argv[5]) if len(sys.argv) > 5 \
+                    else Path(__file__).with_name('README.md')
+    force         = len(sys.argv) > 6 and sys.argv[6].lower() == 'true'
 
     # No-op if nothing changed and force flag is not set
     upload_empty = not Path(upload_file).exists() or Path(upload_file).stat().st_size == 0
@@ -110,13 +122,18 @@ def main():
         print("No changes detected — skipping index rebuild.")
         return
 
-    template = Template(template_file.read_text(encoding='utf-8'))
-    new_indexes = []
+    template     = Template(template_file.read_text(encoding='utf-8'))
+    footer_html  = md_to_html(readme_file) if readme_file.exists() else ''
+    new_indexes  = []
 
-    for dirpath, dirnames, _ in os.walk(staging_dir):
-        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
-        dp = Path(dirpath)
-        html = build_index(dp, staging_dir, template)
+    # Only root dir and one level down
+    dirs_to_index = [staging_dir] + [
+        d for d in sorted(staging_dir.iterdir())
+        if d.is_dir() and d.name not in SKIP_DIRS
+    ]
+
+    for dp in dirs_to_index:
+        html = build_index(dp, staging_dir, template, footer_html)
         index_path = dp / 'index.html'
         index_path.write_text(html, encoding='utf-8')
         rel = index_path.relative_to(staging_dir)
