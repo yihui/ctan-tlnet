@@ -130,6 +130,7 @@ jobs:
             /tmp/to-upload.txt \
             /tmp/to-delete.txt \
             index_template.html \
+            README.md \
             ${{ inputs.force_index || 'false' }}
 
       - name: Upload changed files to R2
