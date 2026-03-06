@@ -1,0 +1,7 @@
+name       = "tlnet-worker"
+main       = "worker.js"
+compatibility_date = "2025-01-01"
+
+routes = [
+  { pattern = "tlnet.yihui.org/*", zone_name = "yihui.org" }
+]
