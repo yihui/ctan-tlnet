@@ -25,7 +25,7 @@ SUPPORTED = {
 #   foo.x86_64-linux.r12345.tar.xz
 # Does NOT match plain runtime tarballs like:
 #   foo.tar.xz  or  foo.r12345.tar.xz
-PATTERN = re.compile(r'^[^.]+\.(?!r\d+\.tar\.xz)([a-z0-9_]+(?:-[a-z0-9]+)*)\.(?:r\d+\.)?tar\.xz$')
+PATTERN = re.compile(r'^[^.]+\.(?!r\d+\.tar\.xz)((?:[a-z0-9_]+-[a-z0-9]+[a-z0-9_-]*)|windows)\.(?:r\d+\.)?tar\.xz$')
 
 def main():
     staging_dir = Path(sys.argv[1])
