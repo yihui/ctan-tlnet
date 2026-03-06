@@ -2,7 +2,7 @@ name: Sync CTAN tlnet
 
 on:
   schedule:
-    - cron: '0 0 * * *'   # daily at 00:00 UTC
+    - cron: "0 0 * * *" # daily at 00:00 UTC
   workflow_dispatch:
 
 jobs:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     permissions:
-      actions: write   # needed for gh cache delete
+      actions: write # needed for gh cache delete
 
     env:
       RCLONE_CONFIG_R2_TYPE: s3
@@ -44,7 +44,6 @@ jobs:
           path: ${{ env.STAGING_DIR }}
           key: tlnet-${{ runner.os }}
 
-
       - name: Report cache status
         run: |
           if [ "${{ steps.cache-restore.outputs.cache-hit }}" = "true" ]; then
@@ -58,7 +57,8 @@ jobs:
         run: |
           # --itemize-changes prints one line per changed file:
           #   >f+++++++++ path/to/new-or-changed-file
-          #   *deleting   path/to/removed-file
+          #   >L+++++++++ path/to/new-or-changed-symlink
+          #   *deleting   path/to/removed-file-or-symlink
           # Redirect all output to the changes file; no progress or stats.
           rsync \
             --archive \
@@ -96,24 +96,6 @@ jobs:
             "$STAGING_DIR/" \
             > /tmp/rsync-changes.txt
 
-      - name: Parse rsync changes
-        run: |
-          # Lines starting with >f = new or updated regular file
-          # (symlinks have 'L' in position 2, not 'f', so already excluded)
-          grep '^>f' /tmp/rsync-changes.txt \
-            | awk '{print $2}' > /tmp/to-upload.txt || true
-
-          # Lines starting with *deleting = file removed from source
-          # Filter out symlinks: check if path was a symlink in staging dir
-          grep '^\*deleting' /tmp/rsync-changes.txt \
-            | awk '{print $2}' \
-            | while IFS= read -r f; do
-                [ -L "$STAGING_DIR/$f" ] || echo "$f"
-              done > /tmp/to-delete.txt || true
-
-          echo "Files to upload: $(wc -l < /tmp/to-upload.txt)"
-          echo "Files to delete: $(wc -l < /tmp/to-delete.txt)"
-
       - name: Report staging size
         run: du -sh "$STAGING_DIR"
 
@@ -135,25 +117,33 @@ jobs:
           path: ${{ env.STAGING_DIR }}
           key: tlnet-${{ runner.os }}
 
-      # build_indexes.py reads index_template.html from the repo root.
-      # It exits early (no-op) if both to-upload and to-delete are empty.
-      # On rebuild it walks every directory, writes index.html into each,
-      # and appends their relative paths to to-upload.txt so rclone picks
-      # them up in the next step.
-      - name: Build symlinks.json
-        run: python3 build_symlinks.py "$STAGING_DIR" /tmp/to-upload.txt
+      # Replace each symlink foo.tar.xz -> foo.r12345.tar.xz with a real
+      # copy of the target, then delete the versioned file. After this step,
+      # staging contains only unversioned filenames as real files.
+      - name: Resolve symlinks in staging
+        run: python3 resolve_symlinks.py "$STAGING_DIR"
 
-      - name: Remove symlinks from staging before rclone
-        run: find "$STAGING_DIR" -type l -delete
+      - name: Parse rsync changes
+        run: |
+          # >f = new/updated regular file; >L = new/updated symlink
+          # After symlink resolution both map to real files in staging.
+          # Only include paths that actually exist in staging now.
+          grep '^>[fL]' /tmp/rsync-changes.txt \
+            | awk '{print $2}' \
+            | while IFS= read -r f; do
+                [ -e "$STAGING_DIR/$f" ] && echo "$f"
+              done > /tmp/to-upload.txt || true
 
       - name: Build directory index pages
         run: |
           python3 build_indexes.py \
             "$STAGING_DIR" \
             /tmp/to-upload.txt \
-            /tmp/to-delete.txt \
             index_template.html \
             README.md
+
+      - name: Check for unexpected platforms in archive
+        run: python3 check_platforms.py "$STAGING_DIR"
 
       - name: Upload changed files to R2
         run: |
@@ -175,16 +165,6 @@ jobs:
             --retries-sleep 30s \
             --log-level INFO
 
-      - name: Delete removed files from R2
-        run: |
-          if [ ! -s /tmp/to-delete.txt ]; then
-            echo "Nothing to delete."
-            exit 0
-          fi
-          while IFS= read -r f; do
-            rclone delete "r2:${{ secrets.R2_BUCKET_NAME }}/$f" --log-level INFO
-          done < /tmp/to-delete.txt
-
       - name: Final sync to R2 (size-only, safety net)
         run: |
           rclone sync \
@@ -200,10 +180,6 @@ jobs:
             --low-level-retries 10 \
             --retries-sleep 30s \
             --log-level INFO
-
-      - name: Check for unexpected platforms in archive
-        run: python3 check_platforms.py "$STAGING_DIR"
-
 
       - name: Print bucket summary
         if: always()
