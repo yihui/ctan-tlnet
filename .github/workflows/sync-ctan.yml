@@ -67,18 +67,30 @@ jobs:
             --hard-links \
             --partial \
             --itemize-changes \
+            --exclude='/archive/*.doc.tar.xz' \
             --exclude='/archive/*.doc.*.tar.xz' \
+            --exclude='/archive/*.source.tar.xz' \
             --exclude='/archive/*.source.*.tar.xz' \
             --exclude='/update-tlmgr-*' \
+            --exclude='/archive/*.amd64-freebsd.tar.xz' \
             --exclude='/archive/*.amd64-freebsd.*.tar.xz' \
+            --exclude='/archive/*.amd64-netbsd.tar.xz' \
             --exclude='/archive/*.amd64-netbsd.*.tar.xz' \
+            --exclude='/archive/*.armhf-linux.tar.xz' \
             --exclude='/archive/*.armhf-linux.*.tar.xz' \
+            --exclude='/archive/*.i386-freebsd.tar.xz' \
             --exclude='/archive/*.i386-freebsd.*.tar.xz' \
+            --exclude='/archive/*.i386-linux.tar.xz' \
             --exclude='/archive/*.i386-linux.*.tar.xz' \
+            --exclude='/archive/*.i386-netbsd.tar.xz' \
             --exclude='/archive/*.i386-netbsd.*.tar.xz' \
+            --exclude='/archive/*.i386-solaris.tar.xz' \
             --exclude='/archive/*.i386-solaris.*.tar.xz' \
+            --exclude='/archive/*.x86_64-cygwin.tar.xz' \
             --exclude='/archive/*.x86_64-cygwin.*.tar.xz' \
+            --exclude='/archive/*.x86_64-darwinlegacy.tar.xz' \
             --exclude='/archive/*.x86_64-darwinlegacy.*.tar.xz' \
+            --exclude='/archive/*.x86_64-solaris.tar.xz' \
             --exclude='/archive/*.x86_64-solaris.*.tar.xz' \
             rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
             "$STAGING_DIR/" \
@@ -86,13 +98,18 @@ jobs:
 
       - name: Parse rsync changes
         run: |
-          # Lines starting with >f = new or updated file
+          # Lines starting with >f = new or updated regular file
+          # (symlinks have 'L' in position 2, not 'f', so already excluded)
           grep '^>f' /tmp/rsync-changes.txt \
             | awk '{print $2}' > /tmp/to-upload.txt || true
 
           # Lines starting with *deleting = file removed from source
+          # Filter out symlinks: check if path was a symlink in staging dir
           grep '^\*deleting' /tmp/rsync-changes.txt \
-            | awk '{print $2}' > /tmp/to-delete.txt || true
+            | awk '{print $2}' \
+            | while IFS= read -r f; do
+                [ -L "$STAGING_DIR/$f" ] || echo "$f"
+              done > /tmp/to-delete.txt || true
 
           echo "Files to upload: $(wc -l < /tmp/to-upload.txt)"
           echo "Files to delete: $(wc -l < /tmp/to-delete.txt)"
@@ -125,6 +142,9 @@ jobs:
       # them up in the next step.
       - name: Build symlinks.json
         run: python3 build_symlinks.py "$STAGING_DIR" /tmp/to-upload.txt
+
+      - name: Remove symlinks from staging before rclone
+        run: find "$STAGING_DIR" -type l -delete
 
       - name: Build directory index pages
         run: |
