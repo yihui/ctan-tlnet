@@ -2,10 +2,7 @@
 """Build index.html for root dir and one level down in the tlnet staging tree.
 
 Usage:
-    build_indexes.py <staging_dir> <to_upload_file> <to_delete_file> <template> <readme> [force]
-
-Exits early (no-op) if both to_upload_file and to_delete_file are empty,
-i.e. rsync found no changes since the last sync, unless force=true.
+    build_indexes.py <staging_dir> <to_upload_file> <to_delete_file> <template> <readme>
 """
 
 import os
@@ -113,14 +110,6 @@ def main():
                     else Path(__file__).with_name('index_template.html')
     readme_file   = Path(sys.argv[5]) if len(sys.argv) > 5 \
                     else Path(__file__).with_name('README.md')
-    force         = len(sys.argv) > 6 and sys.argv[6].lower() == 'true'
-
-    # No-op if nothing changed and force flag is not set
-    upload_empty = not Path(upload_file).exists() or Path(upload_file).stat().st_size == 0
-    delete_empty = not Path(delete_file).exists() or Path(delete_file).stat().st_size == 0
-    if upload_empty and delete_empty and not force:
-        print("No changes detected — skipping index rebuild.")
-        return
 
     template     = Template(template_file.read_text(encoding='utf-8'))
     footer_html  = md_to_html(readme_file) if readme_file.exists() else ''
