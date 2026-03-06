@@ -3,9 +3,6 @@ main       = "worker.js"
 compatibility_date = "2025-01-01"
 workers_dev = false
 
-# Only intercept directory requests that need rewriting to index.html.
-# All other requests (tarballs, tlpdb, etc.) go directly to R2.
 routes = [
-  { pattern = "tlnet.yihui.org/*/", zone_name = "yihui.org" },
   { pattern = "tlnet.yihui.org/", zone_name = "yihui.org" }
 ]

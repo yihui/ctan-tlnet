@@ -45,9 +45,9 @@ def build_index(
 
     # Breadcrumb
     parts = list(rel.parts)
-    crumbs = ['<a href="/">tlnet</a>']
+    crumbs = ['<a href="/index.html">tlnet</a>']
     for i, part in enumerate(parts):
-        href = "/" + "/".join(parts[: i + 1]) + "/"
+        href = "/" + "/".join(parts[: i + 1]) + "/index.html"
         if i < len(parts) - 1:
             crumbs.append(f'<a href="{href}">{part}</a>')
         else:
@@ -72,14 +72,16 @@ def build_index(
     # File listing rows
     rows = []
     if dirpath != staging_dir:
-        rows.append('<li class="entry dir"><a href="../">../</a><span></span></li>')
+        rows.append(
+            '<li class="entry dir"><a href="../index.html">../</a><span></span></li>'
+        )
     # Only link subdirs if they have an index.html (root and 1-level-down only)
     depth = len(rel.parts)
     for d in subdirs:
         if depth == 0:  # root: subdirs are 1 level down, they have index.html
             rows.append(
                 f'<li class="entry dir">'
-                f'<a href="{d.name}/">{d.name}/</a><span></span></li>'
+                f'<a href="{d.name}/index.html">{d.name}/</a><span></span></li>'
             )
         else:  # 1-level-down: subdirs are 2 levels down, no index.html
             rows.append(
