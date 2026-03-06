@@ -33,6 +33,8 @@ def main():
 
     found = set()
     for f in archive.iterdir():
+        if f.is_symlink():
+            continue
         m = PATTERN.match(f.name)
         if m:
             found.add(m.group(1))
