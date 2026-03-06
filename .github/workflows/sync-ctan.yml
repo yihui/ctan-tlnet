@@ -4,11 +4,6 @@ on:
   schedule:
     - cron: '0 0 * * *'   # daily at 00:00 UTC
   workflow_dispatch:
-    inputs:
-      force_index:
-        description: 'Force rebuild of all index pages'
-        type: boolean
-        default: false
 
 jobs:
   sync:
@@ -138,8 +133,7 @@ jobs:
             /tmp/to-upload.txt \
             /tmp/to-delete.txt \
             index_template.html \
-            README.md \
-            ${{ inputs.force_index || 'false' }}
+            README.md
 
       - name: Upload changed files to R2
         run: |
