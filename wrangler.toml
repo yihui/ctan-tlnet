@@ -6,3 +6,8 @@ workers_dev = false
 routes = [
   { pattern = "tlnet.yihui.org/", zone_name = "yihui.org" }
 ]
+
+[observability]
+[observability.logs]
+enabled = true
+invocation_logs = true
