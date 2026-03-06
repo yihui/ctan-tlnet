@@ -66,7 +66,6 @@ jobs:
             --archive \
             --delete \
             --delete-excluded \
-            --no-links \
             --hard-links \
             --partial \
             --itemize-changes \
@@ -126,6 +125,9 @@ jobs:
       # On rebuild it walks every directory, writes index.html into each,
       # and appends their relative paths to to-upload.txt so rclone picks
       # them up in the next step.
+      - name: Build symlinks.json
+        run: python3 build_symlinks.py "$STAGING_DIR" /tmp/to-upload.txt
+
       - name: Build directory index pages
         run: |
           python3 build_indexes.py \
@@ -146,6 +148,7 @@ jobs:
             r2:${{ secrets.R2_BUCKET_NAME }} \
             --files-from /tmp/to-upload.txt \
             --no-traverse \
+            --ignore-symlinks \
             --transfers 8 \
             --stats 60s \
             --stats-one-line \
@@ -171,6 +174,7 @@ jobs:
             "$STAGING_DIR/" \
             r2:${{ secrets.R2_BUCKET_NAME }} \
             --size-only \
+            --ignore-symlinks \
             --transfers 8 \
             --checkers 16 \
             --stats 60s \
