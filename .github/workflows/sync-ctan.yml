@@ -44,8 +44,6 @@ jobs:
           path: ${{ env.STAGING_DIR }}
           key: tlnet-${{ runner.os }}
 
-      - name: Remove symlinks left over from cache
-        run: find "$STAGING_DIR" -type l -delete
 
       - name: Report cache status
         run: |
@@ -148,7 +146,6 @@ jobs:
             r2:${{ secrets.R2_BUCKET_NAME }} \
             --files-from /tmp/to-upload.txt \
             --no-traverse \
-            --ignore-symlinks \
             --transfers 8 \
             --stats 60s \
             --stats-one-line \
@@ -174,7 +171,6 @@ jobs:
             "$STAGING_DIR/" \
             r2:${{ secrets.R2_BUCKET_NAME }} \
             --size-only \
-            --ignore-symlinks \
             --transfers 8 \
             --checkers 16 \
             --stats 60s \
