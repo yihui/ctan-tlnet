@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@HEAD
 
       - name: Install rclone and cmark
         run: |
@@ -39,7 +39,7 @@ jobs:
 
       - name: Restore tlnet cache
         id: cache-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@HEAD
         with:
           path: ${{ env.STAGING_DIR }}
           key: tlnet-${{ runner.os }}
@@ -112,7 +112,7 @@ jobs:
             --repo ${{ github.repository }} || true
 
       - name: Save tlnet cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@HEAD
         with:
           path: ${{ env.STAGING_DIR }}
           key: tlnet-${{ runner.os }}
