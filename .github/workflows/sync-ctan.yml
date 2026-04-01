@@ -149,37 +149,28 @@ jobs:
         run: |
           failed=0
 
-          while IFS= read -r md5file; do
-            basefile="${md5file%.md5}"
-            if [ ! -f "$basefile" ]; then
-              echo "WARNING: $basefile not found, skipping MD5 check"
-              continue
-            fi
-            expected=$(awk '{print $1}' "$md5file")
-            actual=$(md5sum "$basefile" | awk '{print $1}')
-            if [ "$expected" != "$actual" ]; then
-              echo "ERROR: MD5 mismatch for $basefile"
-              echo "  Expected: $expected"
-              echo "  Actual:   $actual"
-              failed=$((failed + 1))
-            fi
-          done < <(find "$STAGING_DIR" -name "*.md5" -type f)
+          verify_checksums() {
+            local ext="$1"   # e.g. "md5" or "sha256"
+            local cmd="$2"   # e.g. "md5sum" or "sha256sum"
+            while IFS= read -r sumfile; do
+              basefile="${sumfile%.$ext}"
+              if [ ! -f "$basefile" ]; then
+                echo "WARNING: $basefile not found, skipping ${ext^^} check"
+                continue
+              fi
+              expected=$(awk '{print $1}' "$sumfile")
+              actual=$("$cmd" "$basefile" | awk '{print $1}')
+              if [ "$expected" != "$actual" ]; then
+                echo "ERROR: ${ext^^} mismatch for $basefile"
+                echo "  Expected: $expected"
+                echo "  Actual:   $actual"
+                failed=$((failed + 1))
+              fi
+            done < <(find "$STAGING_DIR" -name "*.$ext" -type f)
+          }
 
-          while IFS= read -r shafile; do
-            basefile="${shafile%.sha256}"
-            if [ ! -f "$basefile" ]; then
-              echo "WARNING: $basefile not found, skipping SHA256 check"
-              continue
-            fi
-            expected=$(awk '{print $1}' "$shafile")
-            actual=$(sha256sum "$basefile" | awk '{print $1}')
-            if [ "$expected" != "$actual" ]; then
-              echo "ERROR: SHA256 mismatch for $basefile"
-              echo "  Expected: $expected"
-              echo "  Actual:   $actual"
-              failed=$((failed + 1))
-            fi
-          done < <(find "$STAGING_DIR" -name "*.sha256" -type f)
+          verify_checksums md5    md5sum
+          verify_checksums sha256 sha256sum
 
           if [ "$failed" -gt 0 ]; then
             echo "FATAL: $failed checksum verification(s) failed. Aborting upload."
