@@ -46,4 +46,4 @@ rsync \
   --exclude='/archive/*.x86_64-solaris.*.tar.xz' \
   rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
   "$STAGING_DIR/" \
-  > /tmp/rsync-changes.txt
+  >> /tmp/rsync-changes.txt
