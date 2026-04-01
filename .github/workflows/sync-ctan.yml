@@ -145,6 +145,48 @@ jobs:
       - name: Check for unexpected platforms in archive
         run: python3 check_platforms.py "$STAGING_DIR"
 
+      - name: Verify checksums
+        run: |
+          failed=0
+
+          while IFS= read -r md5file; do
+            basefile="${md5file%.md5}"
+            if [ ! -f "$basefile" ]; then
+              echo "WARNING: $basefile not found, skipping MD5 check"
+              continue
+            fi
+            expected=$(awk '{print $1}' "$md5file")
+            actual=$(md5sum "$basefile" | awk '{print $1}')
+            if [ "$expected" != "$actual" ]; then
+              echo "ERROR: MD5 mismatch for $basefile"
+              echo "  Expected: $expected"
+              echo "  Actual:   $actual"
+              failed=$((failed + 1))
+            fi
+          done < <(find "$STAGING_DIR" -name "*.md5" -type f)
+
+          while IFS= read -r shafile; do
+            basefile="${shafile%.sha256}"
+            if [ ! -f "$basefile" ]; then
+              echo "WARNING: $basefile not found, skipping SHA256 check"
+              continue
+            fi
+            expected=$(awk '{print $1}' "$shafile")
+            actual=$(sha256sum "$basefile" | awk '{print $1}')
+            if [ "$expected" != "$actual" ]; then
+              echo "ERROR: SHA256 mismatch for $basefile"
+              echo "  Expected: $expected"
+              echo "  Actual:   $actual"
+              failed=$((failed + 1))
+            fi
+          done < <(find "$STAGING_DIR" -name "*.sha256" -type f)
+
+          if [ "$failed" -gt 0 ]; then
+            echo "FATAL: $failed checksum verification(s) failed. Aborting upload."
+            exit 1
+          fi
+          echo "All checksum verifications passed."
+
       - name: Upload changed files to R2
         run: |
           if [ ! -s /tmp/to-upload.txt ]; then
