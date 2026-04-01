@@ -146,37 +146,7 @@ jobs:
         run: python3 check_platforms.py "$STAGING_DIR"
 
       - name: Verify checksums
-        run: |
-          failed=0
-
-          verify_checksums() {
-            local ext="$1"   # e.g. "md5" or "sha256"
-            local cmd="$2"   # e.g. "md5sum" or "sha256sum"
-            while IFS= read -r sumfile; do
-              basefile="${sumfile%.$ext}"
-              if [ ! -f "$basefile" ]; then
-                echo "WARNING: $basefile not found, skipping ${ext^^} check"
-                continue
-              fi
-              expected=$(awk '{print $1}' "$sumfile")
-              actual=$("$cmd" "$basefile" | awk '{print $1}')
-              if [ "$expected" != "$actual" ]; then
-                echo "ERROR: ${ext^^} mismatch for $basefile"
-                echo "  Expected: $expected"
-                echo "  Actual:   $actual"
-                failed=$((failed + 1))
-              fi
-            done < <(find "$STAGING_DIR" -name "*.$ext" -type f)
-          }
-
-          verify_checksums md5    md5sum
-          verify_checksums sha256 sha256sum
-
-          if [ "$failed" -gt 0 ]; then
-            echo "FATAL: $failed checksum verification(s) failed. Aborting upload."
-            exit 1
-          fi
-          echo "All checksum verifications passed."
+        run: bash verify_checksums.sh "$STAGING_DIR"
 
       - name: Upload changed files to R2
         run: |
