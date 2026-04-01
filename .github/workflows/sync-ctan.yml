@@ -53,48 +53,24 @@ jobs:
             echo "Cache miss — rsync will do a full download."
           fi
 
-      - name: Rsync CTAN tlnet to local staging
+      - name: Rsync CTAN tlnet to local staging (with checksum verification)
         run: |
-          # --itemize-changes prints one line per changed file:
-          #   >f+++++++++ path/to/new-or-changed-file
-          #   >L+++++++++ path/to/new-or-changed-symlink
-          #   *deleting   path/to/removed-file-or-symlink
-          # Redirect all output to the changes file; no progress or stats.
-          rsync \
-            --archive \
-            --delete \
-            --delete-excluded \
-            --hard-links \
-            --partial \
-            --itemize-changes \
-            --exclude='/archive/*.doc.tar.xz' \
-            --exclude='/archive/*.doc.*.tar.xz' \
-            --exclude='/archive/*.source.tar.xz' \
-            --exclude='/archive/*.source.*.tar.xz' \
-            --exclude='/update-tlmgr-*' \
-            --exclude='/archive/*.amd64-freebsd.tar.xz' \
-            --exclude='/archive/*.amd64-freebsd.*.tar.xz' \
-            --exclude='/archive/*.amd64-netbsd.tar.xz' \
-            --exclude='/archive/*.amd64-netbsd.*.tar.xz' \
-            --exclude='/archive/*.armhf-linux.tar.xz' \
-            --exclude='/archive/*.armhf-linux.*.tar.xz' \
-            --exclude='/archive/*.i386-freebsd.tar.xz' \
-            --exclude='/archive/*.i386-freebsd.*.tar.xz' \
-            --exclude='/archive/*.i386-linux.tar.xz' \
-            --exclude='/archive/*.i386-linux.*.tar.xz' \
-            --exclude='/archive/*.i386-netbsd.tar.xz' \
-            --exclude='/archive/*.i386-netbsd.*.tar.xz' \
-            --exclude='/archive/*.i386-solaris.tar.xz' \
-            --exclude='/archive/*.i386-solaris.*.tar.xz' \
-            --exclude='/archive/*.x86_64-cygwin.tar.xz' \
-            --exclude='/archive/*.x86_64-cygwin.*.tar.xz' \
-            --exclude='/archive/*.x86_64-darwinlegacy.tar.xz' \
-            --exclude='/archive/*.x86_64-darwinlegacy.*.tar.xz' \
-            --exclude='/archive/*.x86_64-solaris.tar.xz' \
-            --exclude='/archive/*.x86_64-solaris.*.tar.xz' \
-            rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ \
-            "$STAGING_DIR/" \
-            > /tmp/rsync-changes.txt
+          max_attempts=20
+          for attempt in $(seq 1 $max_attempts); do
+            echo "Attempt $attempt of $max_attempts: running rsync..."
+            bash rsync_ctan.sh "$STAGING_DIR"
+            if bash verify_checksums.sh "$STAGING_DIR"; then
+              echo "Checksums verified successfully on attempt $attempt."
+              break
+            fi
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              echo "Checksum verification failed. Waiting 5 minutes before retrying..."
+              sleep 300
+            else
+              echo "FATAL: Checksum verification failed after $max_attempts attempts. Aborting."
+              exit 1
+            fi
+          done
 
       - name: Report staging size
         run: du -sh "$STAGING_DIR"
@@ -144,9 +120,6 @@ jobs:
 
       - name: Check for unexpected platforms in archive
         run: python3 check_platforms.py "$STAGING_DIR"
-
-      - name: Verify checksums
-        run: bash verify_checksums.sh "$STAGING_DIR"
 
       - name: Upload changed files to R2
         run: |
