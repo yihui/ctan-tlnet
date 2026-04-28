@@ -101,10 +101,10 @@ jobs:
 
       - name: Parse rsync changes
         run: |
-          # >f = new/updated regular file; >L = new/updated symlink
+          # >f = new/updated regular file; >L = new/updated symlink; cL = changed symlink
           # After symlink resolution both map to real files in staging.
           # Only include paths that actually exist in staging now.
-          grep '^>[fL]' /tmp/rsync-changes.txt \
+          grep '^>[fL]\|^cL' /tmp/rsync-changes.txt \
             | awk '{print $2}' \
             | while IFS= read -r f; do
                 [ -e "$STAGING_DIR/$f" ] && echo "$f"
