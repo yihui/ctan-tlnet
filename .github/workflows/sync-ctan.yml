@@ -73,7 +73,9 @@ jobs:
           done
 
       - name: Report staging size
-        run: du -sh "$STAGING_DIR"
+        run: |
+          du -sh "$STAGING_DIR"
+          find "$STAGING_DIR" -type f -size +20M -exec du -h {} +
 
       # actions/cache has no built-in overwrite support — if the key already
       # exists, cache/save silently skips saving. To force an update we must
