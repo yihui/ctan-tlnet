@@ -10,7 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     permissions:
-      actions: write # needed for gh cache delete
+      actions: write  # needed for gh cache delete
+      contents: write # needed for creating releases and pushing _redirects
 
     env:
       RCLONE_CONFIG_R2_TYPE: s3
@@ -170,3 +171,9 @@ jobs:
           gb = d['bytes'] / 1024**3
           print(f'Bucket: {gb:.2f} GB, {d[\"count\"]} files')
           " || true
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash create_release.sh
