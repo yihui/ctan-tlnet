@@ -1,13 +1,10 @@
-name       = "tlnet"
-main       = "worker.js"
+name = "tlnet"
+pages_build_output_dir = "dist"
 compatibility_date = "2025-01-01"
-workers_dev = false
 
-routes = [
-  { pattern = "tlnet.yihui.org/", zone_name = "yihui.org" }
-]
-
-[observability]
-[observability.logs]
-enabled = true
-invocation_logs = true
+# Cloudflare Pages build settings:
+#   Build command : bash deploy.sh
+#   Output directory: dist   (matches pages_build_output_dir above)
+#
+# Configure the build command in the Cloudflare Pages dashboard under
+# Settings > Builds & deployments, or pass it via `wrangler pages deploy`.
