@@ -12,10 +12,10 @@ find "$STAGING_DIR" -type f -size +24M | sort | while IFS= read -r filepath; do
   relpath="${filepath#$STAGING_DIR/}"
   # Replace every / with = to encode the path in a flat filename
   assetname="${relpath//\//=}"
+  mv "$filepath" "/tmp/$assetname"
   echo "Uploading $relpath as $assetname ..."
   for attempt in $(seq 1 5); do
-    if gh release upload "$RELEASE_TAG" "$filepath" \
-          --name "$assetname" \
+    if gh release upload "$RELEASE_TAG" "/tmp/$assetname" \
           --repo "$GITHUB_REPOSITORY" \
           --clobber; then
       echo "$relpath" >> /tmp/large-files.txt
@@ -31,14 +31,7 @@ find "$STAGING_DIR" -type f -size +24M | sort | while IFS= read -r filepath; do
   done
 done
 
-# Remove large files, compress remainder, upload archive
-
-# Delete the large files we just uploaded from the staging tree
-if [ -s /tmp/large-files.txt ]; then
-  while IFS= read -r relpath; do
-    rm -f "$STAGING_DIR/$relpath"
-  done < /tmp/large-files.txt
-fi
+# Compress remainder, upload archive
 
 # Ensure zstd is available
 command -v zstd &>/dev/null || sudo apt-get install -y zstd -qq
