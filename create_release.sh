@@ -1,9 +1,8 @@
 # Create GitHub release
-TAG=$(date +%Y.%m.%d-%H%M)
-echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
-gh release create "$TAG" \
+RELEASE_TAG=$(date +%Y.%m.%d-%H%M)
+gh release create "$RELEASE_TAG" \
   --repo "$GITHUB_REPOSITORY" \
-  --title "$TAG" \
+  --title "$RELEASE_TAG" \
   --notes "Automated daily sync of CTAN tlnet"
 
 # Upload large files (>24 MB) to GitHub release
