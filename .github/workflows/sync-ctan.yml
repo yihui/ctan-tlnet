@@ -310,3 +310,9 @@ jobs:
           gb = d['bytes'] / 1024**3
           print(f'Bucket: {gb:.2f} GB, {d[\"count\"]} files')
           " || true
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash create_release.sh
