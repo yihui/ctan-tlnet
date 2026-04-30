@@ -9,8 +9,8 @@ gh release create "$RELEASE_TAG" \
 touch /tmp/large-files.txt
 find "$STAGING_DIR" -type f -size +24M | sort | while IFS= read -r filepath; do
   relpath="${filepath#$STAGING_DIR/}"
-  # Replace every / with = to encode the path in a flat filename
-  assetname="${relpath//\//=}"
+  # Replace every / with @ to encode the path in a flat filename
+  assetname="${relpath//\//@}"
   mv "$filepath" "/tmp/$assetname"
   echo "Uploading $relpath as $assetname ..."
   for attempt in $(seq 1 5); do
@@ -63,7 +63,7 @@ done
 echo "# $(date)" > _redirects
 if [ -s /tmp/large-files.txt ]; then
   while IFS= read -r relpath; do
-    assetname="${relpath//\//=}"
+    assetname="${relpath//\//@}"
     echo "/$relpath  https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/$assetname  302" \
       >> _redirects
   done < /tmp/large-files.txt
