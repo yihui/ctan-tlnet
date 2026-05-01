@@ -1,100 +1,190 @@
-# Create GitHub release
-RELEASE_TAG=$(date +%Y.%m.%d-%H%M)
-gh release create "$RELEASE_TAG" \
-  --repo "$GITHUB_REPOSITORY" \
-  --title "$RELEASE_TAG" \
-  --notes "Automated daily sync of CTAN tlnet"
+#!/usr/bin/env bash
+# create_release.sh - Upload large files and the tlnet archive to GitHub Releases.
+#
+# Two permanent releases (v1 and v2) are maintained. When a file's content
+# changes, it is uploaded to the *other* release so the previous version
+# stays accessible for any in-progress downloads. The same alternating logic
+# applies to the main tlnet archive (tlnet.tar.zst).
+#
+# A JSON record file (release-record.json) is committed to the repository
+# root after each run. The Cloudflare Pages build (deploy.sh) reads this
+# record to generate _redirects and to know which release holds the current
+# tlnet.tar.zst.
+#
+# Usage: bash create_release.sh <staging_dir>
+#
+# Required environment variables (set automatically in GitHub Actions):
+#   GITHUB_REPOSITORY   owner/repo
+#   GH_TOKEN or GITHUB_TOKEN
 
-# Upload large files (>24 MB) to GitHub release
-touch /tmp/large-files.txt
-find "$STAGING_DIR" -type f -size +24M | sort | while IFS= read -r filepath; do
-  relpath="${filepath#$STAGING_DIR/}"
-  # Replace every / with @ to encode the path in a flat filename
-  assetname="${relpath//\//@}"
-  mv "$filepath" "/tmp/$assetname"
-  echo "Uploading $relpath as $assetname ..."
+set -euo pipefail
+
+STAGING_DIR="${1:?Usage: $0 <staging_dir>}"
+RECORD_FILE="release-record.json"
+V1_TAG="v1"
+V2_TAG="v2"
+REPO="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY must be set}"
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+other_release() { [ "$1" = "$V1_TAG" ] && echo "$V2_TAG" || echo "$V1_TAG"; }
+
+ensure_release() {
+  local tag="$1"
+  if ! gh release view "$tag" --repo "$REPO" &>/dev/null; then
+    echo "Creating release $tag ..."
+    gh release create "$tag" \
+      --repo "$REPO" \
+      --title "CTAN tlnet assets ($tag)" \
+      --notes "Permanent release holding large files and archives for the CTAN tlnet mirror. Do not delete manually." \
+      --prerelease
+  fi
+}
+
+upload_with_retry() {
+  local tag="$1" file="$2" name="$3"
+  local attempt
   for attempt in $(seq 1 5); do
-    if gh release upload "$RELEASE_TAG" "/tmp/$assetname" \
-          --repo "$GITHUB_REPOSITORY" \
-          --clobber; then
-      echo "$relpath" >> /tmp/large-files.txt
-      break
+    if gh release upload "$tag" "$file" \
+         --name "$name" \
+         --repo "$REPO" \
+         --clobber; then
+      return 0
     fi
     if [ "$attempt" -lt 5 ]; then
-      echo "Attempt $attempt failed, retrying in 30s..."
+      echo "Upload attempt $attempt failed, retrying in 30 s ..."
       sleep 30
-    else
-      echo "ERROR: failed to upload $relpath after 5 attempts"
-      exit 1
     fi
   done
-done
+  echo "ERROR: failed to upload $name after 5 attempts" >&2
+  return 1
+}
 
-# Compress remainder, upload archive
+file_sha256() { sha256sum "$1" | awk '{print $1}'; }
 
-# Ensure zstd is available
+# ---------------------------------------------------------------------------
+# 1. Load existing record (or start fresh)
+# ---------------------------------------------------------------------------
+if [ -f "$RECORD_FILE" ]; then
+  record=$(cat "$RECORD_FILE")
+else
+  record='{"files":{},"archive":{}}'
+fi
+
+# v1 always exists; v2 is created on demand.
+ensure_release "$V1_TAG"
+
+changed=false
+new_record="$record"
+
+# ---------------------------------------------------------------------------
+# 2. Process large files (> 24 MiB)
+# ---------------------------------------------------------------------------
+echo "==> Scanning for files larger than 24 MiB in $STAGING_DIR ..."
+
+while IFS= read -r filepath; do
+  relpath="${filepath#${STAGING_DIR}/}"
+  assetname="${relpath//\//=}"
+  checksum=$(file_sha256 "$filepath")
+
+  existing_checksum=$(echo "$new_record" | jq -r --arg k "$relpath" '.files[$k].checksum // ""')
+  existing_release=$(echo "$new_record"  | jq -r --arg k "$relpath" '.files[$k].release  // ""')
+
+  if [ -z "$existing_release" ]; then
+    # New file — upload to v1.
+    target="$V1_TAG"
+    echo "NEW: $relpath -> $target"
+  elif [ "$checksum" = "$existing_checksum" ]; then
+    echo "UNCHANGED: $relpath"
+    continue
+  else
+    # Content changed — upload to the other release.
+    target=$(other_release "$existing_release")
+    ensure_release "$target"
+    echo "CHANGED: $relpath (was $existing_release) -> $target"
+  fi
+
+  upload_with_retry "$target" "$filepath" "$assetname"
+  changed=true
+
+  new_record=$(echo "$new_record" | jq \
+    --arg k     "$relpath"   \
+    --arg cs    "$checksum"  \
+    --arg rel   "$target"    \
+    --arg asset "$assetname" \
+    '.files[$k] = {checksum: $cs, release: $rel, asset: $asset}')
+
+done < <(find "$STAGING_DIR" -type f -size +24M | sort)
+
+# ---------------------------------------------------------------------------
+# 3. Compress the remaining files (excluding large files) into tlnet.tar.zst
+# ---------------------------------------------------------------------------
+echo "==> Compressing remaining files into tlnet.tar.zst ..."
 command -v zstd &>/dev/null || sudo apt-get install -y zstd -qq
 
-# Compress everything that remains (should be well under 2 GB)
-echo "Compressing $STAGING_DIR ..."
-tar -C "$STAGING_DIR" --zstd -cf /tmp/tlnet.tar.zst .
-du -sh /tmp/tlnet.tar.zst
+# Build tar --exclude arguments for every large file recorded so far
+# (covers previously recorded files and those just uploaded above).
+mapfile -t exclude_args < <(
+  echo "$new_record" | jq -r '.files | keys[] | "--exclude=./\(.)"'
+)
 
-# Upload the archive with retry
-for attempt in $(seq 1 5); do
-  if gh release upload "$RELEASE_TAG" /tmp/tlnet.tar.zst \
-        --repo "$GITHUB_REPOSITORY" \
-        --clobber; then
-    break
-  fi
-  if [ "$attempt" -lt 5 ]; then
-    echo "Attempt $attempt failed, retrying in 30s..."
-    sleep 30
-  else
-    echo "ERROR: failed to upload archive after 5 attempts"
-    exit 1
-  fi
-done
+tar_file="/tmp/tlnet.tar.zst"
+tar -C "$STAGING_DIR" \
+    ${exclude_args[@]+"${exclude_args[@]}"} \
+    --zstd -cf "$tar_file" .
+du -sh "$tar_file"
 
-# Generate _redirects and push to repo
+# ---------------------------------------------------------------------------
+# 4. Upload tlnet.tar.zst (only if its checksum changed)
+# ---------------------------------------------------------------------------
+archive_checksum=$(file_sha256 "$tar_file")
+existing_archive_cs=$(echo "$new_record"  | jq -r '.archive.checksum // ""')
+existing_archive_rel=$(echo "$new_record" | jq -r '.archive.release  // ""')
 
-# Build a Cloudflare Pages _redirects file for every large file.
-# Each line: /rel/path  https://github.com/REPO/releases/download/TAG/rel=path  302
-echo "# $(date)" > _redirects
-if [ -s /tmp/large-files.txt ]; then
-  while IFS= read -r relpath; do
-    assetname="${relpath//\//@}"
-    echo "/$relpath  https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/$assetname  302" \
-      >> _redirects
-  done < /tmp/large-files.txt
-fi
-
-git config user.email "github-actions[bot]@users.noreply.github.com"
-git config user.name "github-actions[bot]"
-git add _redirects
-if git diff --staged --quiet; then
-  echo "No changes to _redirects — nothing to commit."
+if [ "$archive_checksum" = "$existing_archive_cs" ]; then
+  echo "ARCHIVE UNCHANGED: skipping upload."
 else
-  git commit -m "Update _redirects for release $RELEASE_TAG [skip ci]"
-  # Retry push in case of transient remote conflicts
-  for attempt in $(seq 1 3); do
-    if git pull --rebase && git push; then
-      break
-    fi
-    [ "$attempt" -lt 3 ] && sleep 10
-  done
+  if [ -z "$existing_archive_rel" ]; then
+    archive_target="$V1_TAG"
+  else
+    archive_target=$(other_release "$existing_archive_rel")
+    ensure_release "$archive_target"
+  fi
+  echo "Uploading tlnet.tar.zst to $archive_target ..."
+  upload_with_retry "$archive_target" "$tar_file" "tlnet.tar.zst"
+  changed=true
+  new_record=$(echo "$new_record" | jq \
+    --arg cs  "$archive_checksum" \
+    --arg rel "$archive_target"   \
+    '.archive = {checksum: $cs, release: $rel}')
 fi
 
-# Delete old GitHub releases (keep 2 most recent)
-gh release list \
-  --repo "$GITHUB_REPOSITORY" \
-  --limit 100 \
-  --json tagName,createdAt \
-  --jq 'sort_by(.createdAt) | reverse | .[2:] | .[].tagName' \
-| while IFS= read -r tag; do
-    echo "Deleting old release: $tag"
-    gh release delete "$tag" \
-      --repo "$GITHUB_REPOSITORY" \
-      --yes \
-      --cleanup-tag || true
-  done
+rm -f "$tar_file"
+
+# ---------------------------------------------------------------------------
+# 5. Commit the updated record to the repository
+# ---------------------------------------------------------------------------
+if [ "$changed" = "true" ]; then
+  echo "$new_record" | jq '.' > "$RECORD_FILE"
+  git config user.email "github-actions[bot]@users.noreply.github.com"
+  git config user.name  "github-actions[bot]"
+  git add "$RECORD_FILE"
+  if git diff --staged --quiet; then
+    echo "Record file unchanged on disk — nothing to commit."
+  else
+    git commit -m "Update release-record.json [skip ci]"
+    for attempt in $(seq 1 3); do
+      if git pull --rebase && git push; then
+        break
+      fi
+      [ "$attempt" -lt 3 ] && sleep 10
+    done
+  fi
+else
+  echo "Nothing changed — skipping record update."
+fi
+
+echo "==> create_release.sh completed."
+

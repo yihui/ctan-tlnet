@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
-"""Build index.html for root dir and one level down in the tlnet staging tree.
+"""Build index.html for the tlnet staging tree.
 
-Usage:
-    build_indexes.py <staging_dir> <to_upload_file> <template> <readme>
+Usage (GitHub Actions — root + one level only):
+    build_indexes.py <staging_dir> <to_upload_file> [<template>] [<readme>]
+
+Usage (Cloudflare Pages — all subdirectories):
+    build_indexes.py <staging_dir> - [<template>] [<readme>] --all-dirs
+
+When <to_upload_file> is omitted or ``-``, new index paths are not written
+to any file (useful when running outside the rsync workflow).
 """
 
+import argparse
 import os
 import subprocess
 import sys
@@ -39,7 +46,11 @@ def md_to_html(md_path: Path) -> str:
 
 
 def build_index(
-    dirpath: Path, staging_dir: Path, template: Template, footer_html: str
+    dirpath: Path,
+    staging_dir: Path,
+    template: Template,
+    footer_html: str,
+    all_dirs: bool = False,
 ) -> str:
     rel = dirpath.relative_to(staging_dir)
 
@@ -75,15 +86,16 @@ def build_index(
         rows.append(
             '<li class="entry dir"><a href="../index.html">../</a><span></span></li>'
         )
-    # Only link subdirs if they have an index.html (root and 1-level-down only)
     depth = len(rel.parts)
     for d in subdirs:
-        if depth == 0:  # root: subdirs are 1 level down, they have index.html
+        # In all_dirs mode every subdir gets an index.html, so always link.
+        # In normal mode only root-level subdirs (depth 0) get index.html.
+        if all_dirs or depth == 0:
             rows.append(
                 f'<li class="entry dir">'
                 f'<a href="{d.name}/index.html">{d.name}/</a><span></span></li>'
             )
-        else:  # 1-level-down: subdirs are 2 levels down, no index.html
+        else:
             rows.append(
                 f'<li class="entry dir">'
                 f'<span class="dirname">{d.name}/</span><span></span></li>'
@@ -111,17 +123,55 @@ def build_index(
     )
 
 
+def collect_all_dirs(root: Path) -> list[Path]:
+    """Return all directories under *root* in top-down order."""
+    result: list[Path] = []
+    for dirpath_str, dirnames, _ in os.walk(str(root)):
+        dirpath = Path(dirpath_str)
+        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
+        result.append(dirpath)
+    return result
+
+
 def main():
-    staging_dir = Path(sys.argv[1])
-    upload_file = sys.argv[2]
+    parser = argparse.ArgumentParser(
+        description="Build index.html pages for the tlnet staging tree."
+    )
+    parser.add_argument("staging_dir", help="Root of the staging/output directory")
+    parser.add_argument(
+        "upload_file",
+        nargs="?",
+        default="-",
+        help="File to append new index paths to; use '-' to skip (default: -)",
+    )
+    parser.add_argument(
+        "template_file",
+        nargs="?",
+        default=None,
+        help="HTML template path (default: index_template.html next to this script)",
+    )
+    parser.add_argument(
+        "readme_file",
+        nargs="?",
+        default=None,
+        help="README.md path for the footer (default: README.md next to this script)",
+    )
+    parser.add_argument(
+        "--all-dirs",
+        action="store_true",
+        help="Build index.html for every subdirectory (not just one level deep)",
+    )
+    args = parser.parse_args()
+
+    staging_dir = Path(args.staging_dir)
     template_file = (
-        Path(sys.argv[3])
-        if len(sys.argv) > 3
+        Path(args.template_file)
+        if args.template_file
         else Path(__file__).with_name("index_template.html")
     )
     readme_file = (
-        Path(sys.argv[4])
-        if len(sys.argv) > 4
+        Path(args.readme_file)
+        if args.readme_file
         else Path(__file__).with_name("README.md")
     )
 
@@ -129,26 +179,33 @@ def main():
     footer_html = md_to_html(readme_file) if readme_file.exists() else ""
     new_indexes = []
 
-    # Only root dir and one level down
-    dirs_to_index = [staging_dir] + [
-        d
-        for d in sorted(staging_dir.iterdir())
-        if d.is_dir() and d.name not in SKIP_DIRS
-    ]
+    if args.all_dirs:
+        dirs_to_index = collect_all_dirs(staging_dir)
+    else:
+        # Default: root + one level down (original behaviour)
+        dirs_to_index = [staging_dir] + [
+            d
+            for d in sorted(staging_dir.iterdir())
+            if d.is_dir() and d.name not in SKIP_DIRS
+        ]
 
     for dp in dirs_to_index:
-        html = build_index(dp, staging_dir, template, footer_html)
+        html = build_index(dp, staging_dir, template, footer_html, all_dirs=args.all_dirs)
         index_path = dp / "index.html"
         index_path.write_text(html, encoding="utf-8")
         rel = index_path.relative_to(staging_dir)
         new_indexes.append(str(rel))
 
-    with open(upload_file, "a") as f:
-        for p in new_indexes:
-            f.write(p + "\n")
+    # Write new index paths to the upload-tracking file (skipped when "-")
+    upload_file = args.upload_file
+    if upload_file and upload_file != "-":
+        with open(upload_file, "a") as f:
+            for p in new_indexes:
+                f.write(p + "\n")
 
     print(f"Built {len(new_indexes)} index pages.")
 
 
 if __name__ == "__main__":
     main()
+
