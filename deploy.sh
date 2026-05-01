@@ -23,7 +23,10 @@ need_pkg() {
 }
 need_pkg zstd
 need_pkg jq
-need_pkg cmark || true   # cmark is optional; build_indexes.py degrades gracefully
+# cmark is optional — build_indexes.py already handles its absence gracefully.
+if ! command -v cmark &>/dev/null; then
+  apt-get install -y cmark 2>/dev/null || sudo apt-get install -y cmark || true
+fi
 
 # ---------------------------------------------------------------------------
 # 2. Determine the GitHub repository (owner/repo)

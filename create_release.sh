@@ -131,6 +131,8 @@ mapfile -t exclude_args < <(
 )
 
 tar_file="/tmp/tlnet.tar.zst"
+  # ${exclude_args[@]+"${exclude_args[@]}"}: safe expansion that avoids
+  # "unbound variable" errors under set -u when the array is empty.
 tar -C "$STAGING_DIR" \
     ${exclude_args[@]+"${exclude_args[@]}"} \
     --zstd -cf "$tar_file" .
