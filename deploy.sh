@@ -35,7 +35,7 @@ if [ ! -f "$RECORD_FILE" ]; then
   echo "ERROR: $RECORD_FILE not found in the repository root" >&2
   exit 1
 fi
-archive_release=$(jq -r '.archive.release // "v1"' "$RECORD_FILE")
+archive_release=$(python3 -c "import json; print(json.load(open('$RECORD_FILE'))['archive']['release'])" || echo "v1")
 
 # ---------------------------------------------------------------------------
 # 3. Download and extract the archive
@@ -47,4 +47,3 @@ curl -fsSL "https://github.com/${REPO}/releases/download/${archive_release}/tlne
   | tar -C dist --zstd -xf -
 
 echo "Build complete: $(find dist -type f | wc -l) files in dist/"
-
