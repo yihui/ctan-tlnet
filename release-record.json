@@ -1,0 +1,89 @@
+{
+  "files": {
+    "archive/arphic.tar.xz": {
+      "checksum": "fb0eb8ec13e210a3d1023478c35bd897f5e60049a05c87258ca19fa8452cb31b",
+      "release": "v1",
+      "asset": "archive@arphic.tar.xz"
+    },
+    "archive/biber-ms.universal-darwin.tar.xz": {
+      "checksum": "cc2fb1a28acc317e7e45aa74fcf3f97d56cde2a5f3ad37b07d55fbacd11821fd",
+      "release": "v1",
+      "asset": "archive@biber-ms.universal-darwin.tar.xz"
+    },
+    "archive/biber.aarch64-linux.tar.xz": {
+      "checksum": "40e8a24dca5e1b4eb493a14b3d6f670ea532569ae018dee593f7cb56f64ba049",
+      "release": "v1",
+      "asset": "archive@biber.aarch64-linux.tar.xz"
+    },
+    "archive/biber.universal-darwin.tar.xz": {
+      "checksum": "b701db40844f165e0b76ddcdbf869b8de41a5efe17d2164f85d1589185f82b21",
+      "release": "v1",
+      "asset": "archive@biber.universal-darwin.tar.xz"
+    },
+    "archive/biber.x86_64-linux.tar.xz": {
+      "checksum": "cf924a4fa0048f3c190ddc9ea03f96d6dfc9c4024194d0bf64b33cfcafa77780",
+      "release": "v1",
+      "asset": "archive@biber.x86_64-linux.tar.xz"
+    },
+    "archive/cbfonts.tar.xz": {
+      "checksum": "b4ec36812e215fcc2ba2e7b12df17bf98adf31b77c044f22d4c5568465e8f0ee",
+      "release": "v1",
+      "asset": "archive@cbfonts.tar.xz"
+    },
+    "archive/cm-super.tar.xz": {
+      "checksum": "70867904e38451ab1a11ba4677dd5891914f128170b53fac26d3e9dca9d326e4",
+      "release": "v1",
+      "asset": "archive@cm-super.tar.xz"
+    },
+    "archive/haranoaji-extra.tar.xz": {
+      "checksum": "2de4b181bc5f36aa8a8bb3a967d50261150c8a31432c5d40723e2c61cc3e5a89",
+      "release": "v1",
+      "asset": "archive@haranoaji-extra.tar.xz"
+    },
+    "archive/haranoaji.tar.xz": {
+      "checksum": "e9410a8fe32dde7421fb8e4ae46f4e7aa58fe2a487fdb5c2e268ed622c14252b",
+      "release": "v1",
+      "asset": "archive@haranoaji.tar.xz"
+    },
+    "archive/junicode.tar.xz": {
+      "checksum": "9c4a2e7a5912cdcfc6ce2f89ebacf33a86ee3792ad01f595bfae8a56ee342474",
+      "release": "v1",
+      "asset": "archive@junicode.tar.xz"
+    },
+    "archive/lxgw-fonts.tar.xz": {
+      "checksum": "8b4756cab6198a844816327d94b783713fd8173d3365c541bce26b7bf15cd76c",
+      "release": "v1",
+      "asset": "archive@lxgw-fonts.tar.xz"
+    },
+    "archive/nanumtype1.tar.xz": {
+      "checksum": "77e94f530f1e3298c81b40ea5a2dd0f3bd8956af0ea750d3cf68dee581ffdbd9",
+      "release": "v1",
+      "asset": "archive@nanumtype1.tar.xz"
+    },
+    "archive/noto.tar.xz": {
+      "checksum": "a2879526cf8f2f15af8edee5cb9293b232d3f172233d2a3353f2e8ef60e439af",
+      "release": "v1",
+      "asset": "archive@noto.tar.xz"
+    },
+    "archive/roboto.tar.xz": {
+      "checksum": "0c5fb7df38ffce9ccda71dd599cfa684f5739e885a3ae2a166756abe964299c9",
+      "release": "v1",
+      "asset": "archive@roboto.tar.xz"
+    },
+    "archive/tlcockpit.tar.xz": {
+      "checksum": "dd0f2d115ea48670bcf5b0e7075756d12def9dfce8c64c0015ede8776cda4940",
+      "release": "v1",
+      "asset": "archive@tlcockpit.tar.xz"
+    },
+    "install-tl.zip": {
+      "checksum": "251c68d483e6891798046f42fc4dabfce62d3954a81c3e9ba1bd1f297807585c",
+      "release": "v1",
+      "asset": "install-tl.zip"
+    }
+  },
+  "archive": {
+    "checksum": "92c75dc30405efe4295375b4762934d9dc972a465d8f10c2453e6b0ff6c0d0e8",
+    "release": "v1"
+  },
+  "pending_delete": []
+}
