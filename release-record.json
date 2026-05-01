@@ -20,11 +20,6 @@
       "release": "v1",
       "asset": "archive@biber.universal-darwin.tar.xz"
     },
-    "archive/biber.x86_64-linux.tar.xz": {
-      "checksum": "cf924a4fa0048f3c190ddc9ea03f96d6dfc9c4024194d0bf64b33cfcafa77780",
-      "release": "v1",
-      "asset": "archive@biber.x86_64-linux.tar.xz"
-    },
     "archive/cbfonts.tar.xz": {
       "checksum": "b4ec36812e215fcc2ba2e7b12df17bf98adf31b77c044f22d4c5568465e8f0ee",
       "release": "v1",
@@ -34,11 +29,6 @@
       "checksum": "70867904e38451ab1a11ba4677dd5891914f128170b53fac26d3e9dca9d326e4",
       "release": "v1",
       "asset": "archive@cm-super.tar.xz"
-    },
-    "archive/haranoaji-extra.tar.xz": {
-      "checksum": "2de4b181bc5f36aa8a8bb3a967d50261150c8a31432c5d40723e2c61cc3e5a89",
-      "release": "v1",
-      "asset": "archive@haranoaji-extra.tar.xz"
     },
     "archive/haranoaji.tar.xz": {
       "checksum": "e9410a8fe32dde7421fb8e4ae46f4e7aa58fe2a487fdb5c2e268ed622c14252b",
@@ -65,25 +55,32 @@
       "release": "v1",
       "asset": "archive@noto.tar.xz"
     },
-    "archive/roboto.tar.xz": {
-      "checksum": "0c5fb7df38ffce9ccda71dd599cfa684f5739e885a3ae2a166756abe964299c9",
-      "release": "v1",
-      "asset": "archive@roboto.tar.xz"
-    },
     "archive/tlcockpit.tar.xz": {
       "checksum": "dd0f2d115ea48670bcf5b0e7075756d12def9dfce8c64c0015ede8776cda4940",
       "release": "v1",
       "asset": "archive@tlcockpit.tar.xz"
-    },
-    "install-tl.zip": {
-      "checksum": "b0116deec23bc6c4f0ca3eb7c19beb23fa50527c53116af046268cb35f3be607",
-      "release": "v2",
-      "asset": "install-tl.zip"
     }
   },
   "archive": {
-    "checksum": "9d6c1b50a84c651b2ae78fc40a8dc3284e5b7f34166fa6b5c53b2d774bfa0d40",
-    "release": "v1"
+    "checksum": "11ae1b7008cb9cadc8aab9c99e66130fb507d9aa9624b34d8ce59346256a2366",
+    "release": "v2"
   },
-  "pending_delete": []
+  "pending_delete": [
+    {
+      "release": "v1",
+      "asset": "archive@biber.x86_64-linux.tar.xz"
+    },
+    {
+      "release": "v1",
+      "asset": "archive@haranoaji-extra.tar.xz"
+    },
+    {
+      "release": "v1",
+      "asset": "archive@roboto.tar.xz"
+    },
+    {
+      "release": "v2",
+      "asset": "install-tl.zip"
+    }
+  ]
 }
