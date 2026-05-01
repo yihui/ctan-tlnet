@@ -127,13 +127,13 @@ python3 "$SCRIPT_DIR/build_indexes.py" \
 # ---------------------------------------------------------------------------
 for filepath in "${current_large_files[@]}"; do
   relpath="${filepath#${STAGING_DIR}/}"
-  assetname="${relpath//\//=}"
+  assetname="${relpath//\//@}"
 
   existing_checksum=$(echo "$new_record" | jq -r --arg k "$relpath" '.files[$k].checksum // ""')
   existing_release=$(echo "$new_record"  | jq -r --arg k "$relpath" '.files[$k].release  // ""')
 
   # Always move the large file out so it is not included in the archive.
-  # Asset names use '=' instead of '/' (unique within /tmp since rel paths are unique).
+  # Asset names use '@' instead of '/' (unique within /tmp since rel paths are unique).
   tmpfile="/tmp/$assetname"
   mv "$filepath" "$tmpfile"
 
@@ -258,4 +258,3 @@ else
 fi
 
 echo "==> create_release.sh completed."
-
