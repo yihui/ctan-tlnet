@@ -1,6 +1,3 @@
 name = "tlnet"
 pages_build_output_dir = "dist"
 compatibility_date = "2025-01-01"
-
-[build]
-command = "bash deploy.sh"
