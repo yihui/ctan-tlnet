@@ -245,7 +245,7 @@ if [ "$changed" = "true" ]; then
   if git diff --staged --quiet; then
     echo "Record file unchanged on disk — nothing to commit."
   else
-    git commit -m "Update release-record.json [skip ci]"
+    git commit -m "Update release-record.json"
     for attempt in $(seq 1 3); do
       if git pull --rebase && git push; then
         break
