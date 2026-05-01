@@ -62,25 +62,8 @@
     }
   },
   "archive": {
-    "checksum": "11ae1b7008cb9cadc8aab9c99e66130fb507d9aa9624b34d8ce59346256a2366",
-    "release": "v2"
+    "checksum": "4c7f82b063ef4daa856e2f5da29d7929c762cbe5bc80a7f3586cdb4cc3167a1e",
+    "release": "v1"
   },
-  "pending_delete": [
-    {
-      "release": "v1",
-      "asset": "archive@biber.x86_64-linux.tar.xz"
-    },
-    {
-      "release": "v1",
-      "asset": "archive@haranoaji-extra.tar.xz"
-    },
-    {
-      "release": "v1",
-      "asset": "archive@roboto.tar.xz"
-    },
-    {
-      "release": "v2",
-      "asset": "install-tl.zip"
-    }
-  ]
+  "pending_delete": []
 }
