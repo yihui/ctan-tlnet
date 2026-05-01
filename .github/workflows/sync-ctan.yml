@@ -160,6 +160,11 @@ jobs:
             --retries-sleep 30s \
             --log-level INFO
 
+      - name: Create/update GitHub releases and upload assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash create_release.sh "$STAGING_DIR"
+
       - name: Print bucket summary
         if: always()
         run: |
@@ -171,9 +176,3 @@ jobs:
           gb = d['bytes'] / 1024**3
           print(f'Bucket: {gb:.2f} GB, {d[\"count\"]} files')
           " || true
-
-      - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          bash create_release.sh

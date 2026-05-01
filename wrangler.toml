@@ -1,13 +1,6 @@
-name       = "tlnet"
-main       = "worker.js"
+name = "tlnet"
+pages_build_output_dir = "dist"
 compatibility_date = "2025-01-01"
-workers_dev = false
 
-routes = [
-  { pattern = "tlnet.yihui.org/", zone_name = "yihui.org" }
-]
-
-[observability]
-[observability.logs]
-enabled = true
-invocation_logs = true
+[build]
+command = "bash deploy.sh"
