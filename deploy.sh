@@ -31,6 +31,10 @@ fi
 # 2. Determine which release holds the current archive
 # ---------------------------------------------------------------------------
 RECORD_FILE="release-record.json"
+if [ ! -f "$RECORD_FILE" ]; then
+  echo "ERROR: $RECORD_FILE not found in the repository root" >&2
+  exit 1
+fi
 archive_release=$(jq -r '.archive.release // "v1"' "$RECORD_FILE")
 
 # ---------------------------------------------------------------------------

@@ -105,8 +105,8 @@ mapfile -t current_large_files < <(find "$STAGING_DIR" -type f -size +24M | sort
 
 # Build an associative set of relative paths for O(1) membership tests.
 declare -A current_large_set
-for _fp in "${current_large_files[@]}"; do
-  current_large_set["${_fp#${STAGING_DIR}/}"]=1
+for _large_file in "${current_large_files[@]}"; do
+  current_large_set["${_large_file#${STAGING_DIR}/}"]=1
 done
 
 # ---------------------------------------------------------------------------
@@ -133,6 +133,7 @@ for filepath in "${current_large_files[@]}"; do
   existing_release=$(echo "$new_record"  | jq -r --arg k "$relpath" '.files[$k].release  // ""')
 
   # Always move the large file out so it is not included in the archive.
+  # Asset names use '=' instead of '/' (unique within /tmp since rel paths are unique).
   tmpfile="/tmp/$assetname"
   mv "$filepath" "$tmpfile"
 
@@ -198,6 +199,8 @@ echo "_redirects: $(wc -l < "$STAGING_DIR/_redirects") entries"
 #    Large files were already mv'd out; index.html and _redirects are now inside.
 # ---------------------------------------------------------------------------
 echo "==> Compressing $STAGING_DIR into tlnet.tar.zst ..."
+# All large files were mv'd out in the loop above; index.html and _redirects
+# are now present in STAGING_DIR, so they are included automatically.
 command -v zstd &>/dev/null || sudo apt-get install -y zstd -qq
 
 tar_file="/tmp/tlnet.tar.zst"
