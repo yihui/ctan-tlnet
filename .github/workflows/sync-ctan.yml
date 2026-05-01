@@ -14,26 +14,15 @@ jobs:
       contents: write # needed for creating releases and pushing _redirects
 
     env:
-      RCLONE_CONFIG_R2_TYPE: s3
-      RCLONE_CONFIG_R2_PROVIDER: Cloudflare
-      RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-      RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true"
       STAGING_DIR: $HOME/tlnet
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@HEAD
 
-      - name: Install rclone and cmark
+      - name: Install cmark
         run: |
-          curl -fsSL https://rclone.org/install.sh | sudo bash
           sudo apt-get install -y cmark
-          mkdir -p ~/.config/rclone
-          touch ~/.config/rclone/rclone.conf
-          rclone version
-          rsync --version
 
       - name: Create staging directory
         run: mkdir -p "$STAGING_DIR"
@@ -44,15 +33,6 @@ jobs:
         with:
           path: ${{ env.STAGING_DIR }}
           key: tlnet-${{ runner.os }}
-
-      - name: Report cache status
-        run: |
-          if [ "${{ steps.cache-restore.outputs.cache-hit }}" = "true" ]; then
-            echo "Cache hit — rsync will only transfer the delta."
-            du -sh "$STAGING_DIR" || true
-          else
-            echo "Cache miss — rsync will do a full download."
-          fi
 
       - name: Rsync CTAN tlnet to local staging (with checksum verification)
         run: |
@@ -76,7 +56,6 @@ jobs:
       - name: Report staging size
         run: |
           du -sh "$STAGING_DIR"
-          find "$STAGING_DIR" -type f -size +20M -exec du -h {} +
 
       # actions/cache has no built-in overwrite support — if the key already
       # exists, cache/save silently skips saving. To force an update we must
@@ -102,77 +81,10 @@ jobs:
       - name: Resolve symlinks in staging
         run: python3 resolve_symlinks.py "$STAGING_DIR"
 
-      - name: Parse rsync changes
-        run: |
-          # >f = new/updated regular file; >L = new/updated symlink; cL = changed symlink
-          # After symlink resolution both map to real files in staging.
-          # Only include paths that actually exist in staging now.
-          grep '^>[fL]\|^cL' /tmp/rsync-changes.txt \
-            | awk '{print $2}' \
-            | while IFS= read -r f; do
-                [ -e "$STAGING_DIR/$f" ] && echo "$f"
-              done > /tmp/to-upload.txt || true
-
-      - name: Build directory index pages
-        run: |
-          python3 build_indexes.py \
-            "$STAGING_DIR" \
-            /tmp/to-upload.txt \
-            index_template.html \
-            README.md
-
       - name: Check for unexpected platforms in archive
         run: python3 check_platforms.py "$STAGING_DIR"
-
-      - name: Upload changed files to R2
-        run: |
-          if [ ! -s /tmp/to-upload.txt ]; then
-            echo "Nothing to upload."
-            exit 0
-          fi
-          rclone copy \
-            "$STAGING_DIR/" \
-            r2:${{ secrets.R2_BUCKET_NAME }} \
-            --files-from /tmp/to-upload.txt \
-            --no-traverse \
-            --transfers 8 \
-            --stats 60s \
-            --stats-one-line \
-            --use-mmap \
-            --retries 5 \
-            --low-level-retries 10 \
-            --retries-sleep 30s \
-            --log-level INFO
-
-      - name: Final sync to R2 (size-only, safety net)
-        run: |
-          rclone sync \
-            "$STAGING_DIR/" \
-            r2:${{ secrets.R2_BUCKET_NAME }} \
-            --size-only \
-            --transfers 8 \
-            --checkers 16 \
-            --stats 60s \
-            --stats-one-line \
-            --use-mmap \
-            --retries 5 \
-            --low-level-retries 10 \
-            --retries-sleep 30s \
-            --log-level INFO
 
       - name: Create/update GitHub releases and upload assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash create_release.sh "$STAGING_DIR"
-
-      - name: Print bucket summary
-        if: always()
-        run: |
-          echo "Sync completed at $(date -u)"
-          rclone size r2:${{ secrets.R2_BUCKET_NAME }} --json 2>/dev/null \
-            | python3 -c "
-          import sys, json
-          d = json.load(sys.stdin)
-          gb = d['bytes'] / 1024**3
-          print(f'Bucket: {gb:.2f} GB, {d[\"count\"]} files')
-          " || true
