@@ -87,4 +87,4 @@ jobs:
       - name: Create/update GitHub releases and upload assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash create_release.sh "$STAGING_DIR"
+        run: bash upload_release.sh "$STAGING_DIR"
