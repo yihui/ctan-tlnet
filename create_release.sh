@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
 # create_release.sh - Upload large files and the tlnet archive to GitHub Releases.
 #
-# Two permanent releases (v1 and v2) are maintained. When a file's content
-# changes, it is uploaded to the *other* release so the previous version
-# stays accessible for any in-progress downloads. The same alternating logic
-# applies to the main tlnet archive (tlnet.tar.zst).
-#
-# A JSON record file (release-record.json) is committed to the repository
-# root after each run. The Cloudflare Pages build (deploy.sh) reads this
-# record to generate _redirects and to know which release holds the current
-# tlnet.tar.zst.
+# Architecture:
+#   - Two permanent releases (v1 and v2). Files alternate between them when updated.
+#   - release-record.json tracks checksums, release assignments, and pending deletions.
+#   - index.html pages (_all_ subdirs) and _redirects are built here (GHA) and
+#     bundled inside tlnet.tar.zst so Cloudflare just downloads and extracts.
+#   - Deleted large files are kept accessible for one full day (grace period):
+#     they are added to pending_delete and removed on the *next* daily run.
 #
 # Usage: bash create_release.sh <staging_dir>
 #
@@ -24,6 +22,9 @@ RECORD_FILE="release-record.json"
 V1_TAG="v1"
 V2_TAG="v2"
 REPO="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY must be set}"
+
+# Directory containing this script (repo root); used to locate helper scripts.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -43,12 +44,13 @@ ensure_release() {
   fi
 }
 
+# gh release upload uses the basename of the file as the asset name.
+# Callers must mv/cp the source to /tmp/<desired-asset-name> before calling.
 upload_with_retry() {
-  local tag="$1" file="$2" name="$3"
+  local tag="$1" file="$2"
   local attempt
   for attempt in $(seq 1 5); do
     if gh release upload "$tag" "$file" \
-         --name "$name" \
          --repo "$REPO" \
          --clobber; then
       return 0
@@ -58,7 +60,7 @@ upload_with_retry() {
       sleep 30
     fi
   done
-  echo "ERROR: failed to upload $name after 5 attempts" >&2
+  echo "ERROR: failed to upload $(basename "$file") after 5 attempts" >&2
   return 1
 }
 
@@ -70,7 +72,7 @@ file_sha256() { sha256sum "$1" | awk '{print $1}'; }
 if [ -f "$RECORD_FILE" ]; then
   record=$(cat "$RECORD_FILE")
 else
-  record='{"files":{},"archive":{}}'
+  record='{"files":{},"archive":{},"pending_delete":[]}'
 fi
 
 # v1 always exists; v2 is created on demand.
@@ -80,24 +82,68 @@ changed=false
 new_record="$record"
 
 # ---------------------------------------------------------------------------
-# 2. Process large files (> 24 MiB)
+# 2. Delete assets that were marked for deletion in the previous run
+#    (one-day grace period: assets are removed the day after they disappear)
+# ---------------------------------------------------------------------------
+echo "==> Processing pending deletions from previous run ..."
+while IFS= read -r entry; do
+  [ -z "$entry" ] && continue
+  pd_release=$(echo "$entry" | jq -r '.release')
+  pd_asset=$(echo "$entry"   | jq -r '.asset')
+  echo "Deleting stale asset: $pd_asset from release $pd_release ..."
+  gh release delete-asset "$pd_release" "$pd_asset" \
+    --repo "$REPO" --yes 2>/dev/null || true
+done < <(echo "$new_record" | jq -c '.pending_delete // [] | .[]')
+
+new_record=$(echo "$new_record" | jq '.pending_delete = []')
+
+# ---------------------------------------------------------------------------
+# 3. Capture the current set of large files BEFORE moving any of them out
 # ---------------------------------------------------------------------------
 echo "==> Scanning for files larger than 24 MiB in $STAGING_DIR ..."
+mapfile -t current_large_files < <(find "$STAGING_DIR" -type f -size +24M | sort)
 
-while IFS= read -r filepath; do
+# Build an associative set of relative paths for O(1) membership tests.
+declare -A current_large_set
+for _fp in "${current_large_files[@]}"; do
+  current_large_set["${_fp#${STAGING_DIR}/}"]=1
+done
+
+# ---------------------------------------------------------------------------
+# 4. Build index.html for every subdirectory (files are still in STAGING_DIR)
+# ---------------------------------------------------------------------------
+echo "==> Building index pages ..."
+python3 "$SCRIPT_DIR/build_indexes.py" \
+  "$STAGING_DIR" \
+  "-" \
+  "$SCRIPT_DIR/index_template.html" \
+  "$SCRIPT_DIR/README.md" \
+  --all-dirs
+
+# ---------------------------------------------------------------------------
+# 5. Process each large file:
+#    - mv out of STAGING_DIR (excluded from the archive automatically)
+#    - upload to the appropriate release if checksum changed
+# ---------------------------------------------------------------------------
+for filepath in "${current_large_files[@]}"; do
   relpath="${filepath#${STAGING_DIR}/}"
   assetname="${relpath//\//=}"
-  checksum=$(file_sha256 "$filepath")
 
   existing_checksum=$(echo "$new_record" | jq -r --arg k "$relpath" '.files[$k].checksum // ""')
   existing_release=$(echo "$new_record"  | jq -r --arg k "$relpath" '.files[$k].release  // ""')
+
+  # Always move the large file out so it is not included in the archive.
+  tmpfile="/tmp/$assetname"
+  mv "$filepath" "$tmpfile"
+
+  checksum=$(file_sha256 "$tmpfile")
 
   if [ -z "$existing_release" ]; then
     # New file — upload to v1.
     target="$V1_TAG"
     echo "NEW: $relpath -> $target"
   elif [ "$checksum" = "$existing_checksum" ]; then
-    echo "UNCHANGED: $relpath"
+    echo "UNCHANGED: $relpath (in $existing_release)"
     continue
   else
     # Content changed — upload to the other release.
@@ -106,7 +152,7 @@ while IFS= read -r filepath; do
     echo "CHANGED: $relpath (was $existing_release) -> $target"
   fi
 
-  upload_with_retry "$target" "$filepath" "$assetname"
+  upload_with_retry "$target" "$tmpfile"
   changed=true
 
   new_record=$(echo "$new_record" | jq \
@@ -115,31 +161,51 @@ while IFS= read -r filepath; do
     --arg rel   "$target"    \
     --arg asset "$assetname" \
     '.files[$k] = {checksum: $cs, release: $rel, asset: $asset}')
-
-done < <(find "$STAGING_DIR" -type f -size +24M | sort)
+done
 
 # ---------------------------------------------------------------------------
-# 3. Compress the remaining files (excluding large files) into tlnet.tar.zst
+# 6. Mark large files removed from CTAN for deletion next run
+#    (compare the original record against the current large-file set)
 # ---------------------------------------------------------------------------
-echo "==> Compressing remaining files into tlnet.tar.zst ..."
+echo "==> Checking for removed large files ..."
+while IFS= read -r relpath; do
+  [ -z "$relpath" ] && continue
+  if [ -z "${current_large_set[$relpath]+x}" ]; then
+    pd_release=$(echo "$new_record" | jq -r --arg k "$relpath" '.files[$k].release')
+    pd_asset=$(echo "$new_record"   | jq -r --arg k "$relpath" '.files[$k].asset')
+    echo "REMOVED: $relpath (asset $pd_asset will be deleted from $pd_release next run)"
+    new_record=$(echo "$new_record" | jq \
+      --arg rel   "$pd_release" \
+      --arg asset "$pd_asset"   \
+      '.pending_delete += [{release: $rel, asset: $asset}]')
+    new_record=$(echo "$new_record" | jq --arg k "$relpath" 'del(.files[$k])')
+    changed=true
+  fi
+done < <(echo "$record" | jq -r '.files | keys[]')
+
+# ---------------------------------------------------------------------------
+# 7. Generate _redirects (written into STAGING_DIR → bundled in the archive)
+# ---------------------------------------------------------------------------
+echo "==> Generating _redirects ..."
+echo "$new_record" | jq -r --arg repo "$REPO" '
+  .files | to_entries[] |
+  "/\(.key)  https://github.com/\($repo)/releases/download/\(.value.release)/\(.value.asset)  302"
+' > "$STAGING_DIR/_redirects"
+echo "_redirects: $(wc -l < "$STAGING_DIR/_redirects") entries"
+
+# ---------------------------------------------------------------------------
+# 8. Compress STAGING_DIR into tlnet.tar.zst
+#    Large files were already mv'd out; index.html and _redirects are now inside.
+# ---------------------------------------------------------------------------
+echo "==> Compressing $STAGING_DIR into tlnet.tar.zst ..."
 command -v zstd &>/dev/null || sudo apt-get install -y zstd -qq
 
-# Build tar --exclude arguments for every large file recorded so far
-# (covers previously recorded files and those just uploaded above).
-mapfile -t exclude_args < <(
-  echo "$new_record" | jq -r '.files | keys[] | "--exclude=./\(.)"'
-)
-
 tar_file="/tmp/tlnet.tar.zst"
-  # ${exclude_args[@]+"${exclude_args[@]}"}: safe expansion that avoids
-  # "unbound variable" errors under set -u when the array is empty.
-tar -C "$STAGING_DIR" \
-    ${exclude_args[@]+"${exclude_args[@]}"} \
-    --zstd -cf "$tar_file" .
+tar -C "$STAGING_DIR" --zstd -cf "$tar_file" .
 du -sh "$tar_file"
 
 # ---------------------------------------------------------------------------
-# 4. Upload tlnet.tar.zst (only if its checksum changed)
+# 9. Upload tlnet.tar.zst (only when its checksum changed)
 # ---------------------------------------------------------------------------
 archive_checksum=$(file_sha256 "$tar_file")
 existing_archive_cs=$(echo "$new_record"  | jq -r '.archive.checksum // ""')
@@ -155,7 +221,7 @@ else
     ensure_release "$archive_target"
   fi
   echo "Uploading tlnet.tar.zst to $archive_target ..."
-  upload_with_retry "$archive_target" "$tar_file" "tlnet.tar.zst"
+  upload_with_retry "$archive_target" "$tar_file"
   changed=true
   new_record=$(echo "$new_record" | jq \
     --arg cs  "$archive_checksum" \
@@ -166,7 +232,7 @@ fi
 rm -f "$tar_file"
 
 # ---------------------------------------------------------------------------
-# 5. Commit the updated record to the repository
+# 10. Commit the updated record to the repository
 # ---------------------------------------------------------------------------
 if [ "$changed" = "true" ]; then
   echo "$new_record" | jq '.' > "$RECORD_FILE"
