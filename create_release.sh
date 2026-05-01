@@ -34,10 +34,9 @@ other_release() { [ "$1" = "$V1_TAG" ] && echo "$V2_TAG" || echo "$V1_TAG"; }
 
 ensure_release() {
   local tag="$1"
-  if ! gh release view "$tag" --repo "$REPO" &>/dev/null; then
+  if ! gh release view "$tag" &>/dev/null; then
     echo "Creating release $tag ..."
     gh release create "$tag" \
-      --repo "$REPO" \
       --title "CTAN tlnet assets ($tag)" \
       --notes "Permanent release holding large files and archives for the CTAN tlnet mirror. Do not delete manually." \
       --prerelease
@@ -50,9 +49,7 @@ upload_with_retry() {
   local tag="$1" file="$2"
   local attempt
   for attempt in $(seq 1 5); do
-    if gh release upload "$tag" "$file" \
-         --repo "$REPO" \
-         --clobber; then
+    if gh release upload "$tag" "$file" --clobber; then
       return 0
     fi
     if [ "$attempt" -lt 5 ]; then
@@ -91,8 +88,7 @@ while IFS= read -r entry; do
   pd_release=$(echo "$entry" | jq -r '.release')
   pd_asset=$(echo "$entry"   | jq -r '.asset')
   echo "Deleting stale asset: $pd_asset from release $pd_release ..."
-  gh release delete-asset "$pd_release" "$pd_asset" \
-    --repo "$REPO" --yes 2>/dev/null || true
+  gh release delete-asset "$pd_release" "$pd_asset" --yes 2>/dev/null || true
 done < <(echo "$new_record" | jq -c '.pending_delete // [] | .[]')
 
 new_record=$(echo "$new_record" | jq '.pending_delete = []')
