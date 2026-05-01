@@ -97,7 +97,7 @@ new_record=$(echo "$new_record" | jq '.pending_delete = []')
 # 3. Capture the current set of large files BEFORE moving any of them out
 # ---------------------------------------------------------------------------
 echo "==> Scanning for files larger than 24 MiB in $STAGING_DIR ..."
-mapfile -t current_large_files < <(find "$STAGING_DIR" -type f -size +24M | sort)
+mapfile -t current_large_files < <(find "$STAGING_DIR" -type f -size +25M | sort)
 
 # Build an associative set of relative paths for O(1) membership tests.
 declare -A current_large_set
