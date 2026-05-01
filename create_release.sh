@@ -115,10 +115,8 @@ done
 echo "==> Building index pages ..."
 python3 "$SCRIPT_DIR/build_indexes.py" \
   "$STAGING_DIR" \
-  "-" \
   "$SCRIPT_DIR/index_template.html" \
-  "$SCRIPT_DIR/README.md" \
-  --all-dirs
+  "$SCRIPT_DIR/README.md"
 
 # ---------------------------------------------------------------------------
 # 5. Process each large file:
