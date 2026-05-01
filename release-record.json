@@ -76,14 +76,14 @@
       "asset": "archive@tlcockpit.tar.xz"
     },
     "install-tl.zip": {
-      "checksum": "251c68d483e6891798046f42fc4dabfce62d3954a81c3e9ba1bd1f297807585c",
-      "release": "v1",
+      "checksum": "b0116deec23bc6c4f0ca3eb7c19beb23fa50527c53116af046268cb35f3be607",
+      "release": "v2",
       "asset": "install-tl.zip"
     }
   },
   "archive": {
-    "checksum": "92c75dc30405efe4295375b4762934d9dc972a465d8f10c2453e6b0ff6c0d0e8",
-    "release": "v1"
+    "checksum": "916fafc86fe9a0753d8458c4693090ce818d08b025d308c250815e2f3ef0cf0f",
+    "release": "v2"
   },
   "pending_delete": []
 }
