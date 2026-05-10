@@ -59,11 +59,16 @@
       "checksum": "dd0f2d115ea48670bcf5b0e7075756d12def9dfce8c64c0015ede8776cda4940",
       "release": "v1",
       "asset": "archive@tlcockpit.tar.xz"
+    },
+    "archive/ciad-beamertheme.tar.xz": {
+      "checksum": "7844288556be996a117581421a4d82afbbfe1ceeade1b4ce3a8584c53c3e1e3e",
+      "release": "v1",
+      "asset": "archive@ciad-beamertheme.tar.xz"
     }
   },
   "archive": {
-    "checksum": "ed99cea46951a0c051e100d53a9f83f4597c3de28e998514b17d00dd901a6206",
-    "release": "v1"
+    "checksum": "180b71be4e5b63a31df84a1c942967b16e15f745be7c0a5a9758f549984a6e55",
+    "release": "v2"
   },
   "pending_delete": []
 }
