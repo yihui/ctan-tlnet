@@ -138,6 +138,26 @@ def main():
         (dp / "index.html").write_text(html, encoding="utf-8")
         count += 1
 
+    # Generate 404.html so Cloudflare Pages returns a proper 404 status
+    # instead of serving index.html with 200 for non-existent paths
+    not_found_html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>404 - Not Found</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; color: #222; }
+</style>
+</head>
+<body>
+<h1>404 - Not Found</h1>
+<p>The requested file was not found on this server.</p>
+<p><a href="/">Back to tlnet root</a></p>
+</body>
+</html>
+"""
+    (staging_dir / "404.html").write_text(not_found_html, encoding="utf-8")
+
     print(f"Built {count} index pages.")
 
 
