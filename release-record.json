@@ -16,8 +16,8 @@
       "asset": "archive@biber.aarch64-linux.tar.xz"
     },
     "archive/biber.universal-darwin.tar.xz": {
-      "checksum": "b701db40844f165e0b76ddcdbf869b8de41a5efe17d2164f85d1589185f82b21",
-      "release": "v1",
+      "checksum": "86eaa0fae401f955699abd7c4ff2eb76396c13d8658357da102037777fa922b6",
+      "release": "v2",
       "asset": "archive@biber.universal-darwin.tar.xz"
     },
     "archive/cbfonts.tar.xz": {
@@ -67,8 +67,8 @@
     }
   },
   "archive": {
-    "checksum": "b6d84688e852c7ab5112cbefbe95eacfaff98d15178d61d54136c86fe5e18832",
-    "release": "v2"
+    "checksum": "00fafcd3c8ae16307fb2cd9287006d23d4bf31ce7e6d14c5b100d7bbcd22d26a",
+    "release": "v1"
   },
   "pending_delete": []
 }
