@@ -11,8 +11,8 @@
       "asset": "archive@biber-ms.universal-darwin.tar.xz"
     },
     "archive/biber.aarch64-linux.tar.xz": {
-      "checksum": "40e8a24dca5e1b4eb493a14b3d6f670ea532569ae018dee593f7cb56f64ba049",
-      "release": "v1",
+      "checksum": "73137352fc8cafef93ac04ca123a31ab983de62b8e642086ea590ee0105dee0f",
+      "release": "v2",
       "asset": "archive@biber.aarch64-linux.tar.xz"
     },
     "archive/biber.universal-darwin.tar.xz": {
@@ -67,8 +67,8 @@
     }
   },
   "archive": {
-    "checksum": "00fafcd3c8ae16307fb2cd9287006d23d4bf31ce7e6d14c5b100d7bbcd22d26a",
-    "release": "v1"
+    "checksum": "f9b8d5ca677d67617fe4483ba9b63eff5e0ff30186354b50861e24a9326386c8",
+    "release": "v2"
   },
   "pending_delete": []
 }
