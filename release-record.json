@@ -61,14 +61,14 @@
       "asset": "archive@tlcockpit.tar.xz"
     },
     "archive/ciad-beamertheme.tar.xz": {
-      "checksum": "8eab3a4c2e7a1ce24bb96efeb20de13ed6207e0f16b904a8a310509b2d997185",
-      "release": "v2",
+      "checksum": "fe5fdf88be10fda6e8267e3b15d50ab70bc8384ee253b3d380597eb5acfb9ae5",
+      "release": "v1",
       "asset": "archive@ciad-beamertheme.tar.xz"
     }
   },
   "archive": {
-    "checksum": "d902abeaf1dd9369522047f6abd48140e5c8ecb27b296752566769202397b884",
-    "release": "v1"
+    "checksum": "34a1ffc7bdd3e501150eb8bd3ab057fae75c2d2f1dc35da4d9f67cd984c79696",
+    "release": "v2"
   },
   "pending_delete": []
 }
