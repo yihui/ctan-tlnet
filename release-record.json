@@ -41,8 +41,8 @@
       "asset": "archive@junicode.tar.xz"
     },
     "archive/lxgw-fonts.tar.xz": {
-      "checksum": "2d84be8692760a99911303f99ec501ae7d7f90f76e3c3b41a8e8436fe4e894ff",
-      "release": "v2",
+      "checksum": "1d88b2e1ae07aee578b644bf963cc7970c0518f2ae093db6c119ab8823872e13",
+      "release": "v1",
       "asset": "archive@lxgw-fonts.tar.xz"
     },
     "archive/nanumtype1.tar.xz": {
@@ -67,8 +67,8 @@
     }
   },
   "archive": {
-    "checksum": "4dbb5af3bb85b755eb992a9dc6f0849b50535d5b3e95f90f362f2d9554520cb9",
-    "release": "v2"
+    "checksum": "7c80bf974dd73b500fc4136095da4b21a0b7053f51c84a81dabc5f4c29a36d24",
+    "release": "v1"
   },
   "pending_delete": []
 }
