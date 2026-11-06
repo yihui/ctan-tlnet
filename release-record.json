@@ -67,8 +67,8 @@
     }
   },
   "archive": {
-    "checksum": "a479d15c05ce666584133fb09f0e9be8cc5dde426ee4f3ae163f2d14b1c2e6d7",
-    "release": "v1"
+    "checksum": "f6a21c050eee659b55c619c786d241dd25f07734f475abebe29996942d840b0c",
+    "release": "v2"
   },
   "pending_delete": []
 }
